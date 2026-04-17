@@ -2,6 +2,9 @@
   "name": "quien-da-mas-front",
   "private": true,
   "version": "0.0.1",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
