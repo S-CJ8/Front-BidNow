@@ -498,7 +498,7 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
       <header className="sticky top-0 z-30 border-b border-white/10 bg-black/95">
         <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-4 py-4 md:px-8">
           <p className="shrink-0 font-serif text-lg text-brand-orange md:text-2xl">
-            ¿QUIEN DA MAS?
+            BidNow
           </p>
           <div className="relative hidden flex-1 md:block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />

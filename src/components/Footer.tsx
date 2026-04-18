@@ -9,7 +9,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-6 md:px-8">
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4 lg:gap-10">
           <div id="acerca">
-            <p className="font-serif text-lg text-brand-orange">¿QUIÉN DA MÁS?</p>
+            <p className="font-serif text-lg text-brand-orange">BidNow</p>
             <p className="mt-4 text-sm leading-relaxed text-white/80">
               La plataforma de subastas más confiable de Latinoamérica. Encuentra
               tesoros únicos y participa en subastas emocionantes.
@@ -98,7 +98,7 @@ export function Footer() {
           </div>
         </div>
         <p className="mt-14 border-t border-white/10 pt-8 text-center text-xs text-brand-muted">
-          © {new Date().getFullYear()} ¿QUIÉN DA MÁS? Todos los derechos
+          © {new Date().getFullYear()} BidNow Todos los derechos
           reservados.
         </p>
       </div>

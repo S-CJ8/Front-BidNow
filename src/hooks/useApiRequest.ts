@@ -52,7 +52,15 @@ export function useApiRequest() {
 export function getApiErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 0) {
-      return `${error.message}. Si usas Django, revisa CORS_ALLOWED_ORIGINS.`;
+      const frontOrigin =
+        typeof window !== "undefined" ? window.location.origin : "https://TU-FRONT.onrender.com";
+      return (
+        `${error.message} ` +
+        `En el backend Django agrega esa URL exacta a CORS_ALLOWED_ORIGINS ` +
+        `(por ejemplo: "${frontOrigin}"). ` +
+        `En produccion no existe el proxy de Vite: el navegador exige CORS. ` +
+        `Tambien suele hacer falta CSRF_TRUSTED_ORIGINS con la misma URL.`
+      );
     }
     if (error.status >= 500) {
       return "El servidor respondió con error interno (5xx).";

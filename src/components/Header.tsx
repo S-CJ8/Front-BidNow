@@ -18,7 +18,7 @@ export function Header({
           href="#inicio"
           className="font-serif text-lg tracking-wide text-brand-orange md:text-xl"
         >
-          ¿QUIÉN DA MÁS?
+          BidNow
         </a>
         <nav className="order-last flex w-full basis-full justify-center gap-6 md:order-none md:flex-1 md:w-auto md:basis-auto md:gap-8">
           <a

@@ -75,7 +75,7 @@ export function LoginPage({ onSuccess, onBackHome }: LoginPageProps) {
 
         <div className="text-center">
           <h1 className="font-sans text-2xl font-bold uppercase tracking-wide text-brand-orange md:text-3xl">
-            ¿QUIÉN DA MÁS?
+            BidNow
           </h1>
           <h2 className="mt-4 text-xl font-bold text-white md:text-2xl">
             {mode === "login" ? "Bienvenido de Nuevo" : "Crea tu cuenta"}
