@@ -76,6 +76,11 @@ export async function registerUser(input: RegisterInput): Promise<void> {
   });
 }
 
+/**
+ * POST /api/login/: el serializer del back usa
+ * email = (attrs.get("email") or attrs.get("correo") or "").strip().
+ * Enviar solo `email` basta; `correo` duplicado ayuda si se reutiliza un formulario viejo.
+ */
 export async function loginUser(
   emailOrUsername: string,
   password: string,
@@ -83,6 +88,7 @@ export async function loginUser(
   const trimmed = emailOrUsername.trim();
   const data = await httpClient.post<unknown>("/api/login/", {
     email: trimmed,
+    correo: trimmed,
     password,
   });
   return normalizedUserFromLoginResponse(data);
