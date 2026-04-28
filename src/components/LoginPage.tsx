@@ -26,8 +26,9 @@ export function LoginPage({ onSuccess, onBackHome }: LoginPageProps) {
   async function handleLoginSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
+      const normalizedEmail = loginEmail.trim().toLowerCase();
       const user = await run(
-        () => loginUser(loginEmail, loginPassword),
+        () => loginUser(normalizedEmail, loginPassword),
         "Inicio de sesión exitoso.",
       );
       onSuccess(user);
