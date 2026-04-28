@@ -65,8 +65,8 @@ export function getApiErrorMessage(error: unknown): string {
     if (error.status >= 500) {
       return "El servidor respondió con error interno (5xx).";
     }
-    if (error.status >= 400) {
-      return `Solicitud inválida (${error.status}): ${error.message}`;
+    if (error.status >= 400 && error.status < 500) {
+      return error.message;
     }
     return error.message;
   }

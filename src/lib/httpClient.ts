@@ -38,6 +38,21 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   }
 }
 
+function fieldErrorsToMessage(data: Record<string, unknown>): string | null {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(data)) {
+    if (key === "detail" || key === "message" || key === "error") {
+      continue;
+    }
+    if (Array.isArray(value) && value.length > 0) {
+      parts.push(`${key}: ${String(value[0])}`);
+    } else if (typeof value === "string" && value.trim()) {
+      parts.push(`${key}: ${value}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
 function getErrorMessage(status: number, payload: unknown): string {
   if (typeof payload === "string" && payload.trim()) {
     return payload;
@@ -53,6 +68,10 @@ function getErrorMessage(status: number, payload: unknown): string {
       if (Array.isArray(value) && value.length > 0) {
         return String(value[0]);
       }
+    }
+    const fromFields = fieldErrorsToMessage(data);
+    if (fromFields) {
+      return fromFields;
     }
     return JSON.stringify(payload);
   }
