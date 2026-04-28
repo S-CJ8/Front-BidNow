@@ -1,4 +1,4 @@
-import { httpClient } from "../lib/httpClient";
+import { ApiError, httpClient } from "../lib/httpClient";
 
 export type NormalizedUser = {
   id?: number | string;
@@ -16,6 +16,10 @@ type RegisterInput = {
 };
 
 type ApiRecord = Record<string, unknown>;
+
+/** Mensajes fijos del front (el back ya no devuelve estos textos en JSON de error para este flujo). */
+const MSG_CORREO_NO_REGISTRADO = "No existe un usuario registrado con ese correo.";
+const MSG_CONTRASENA_INCORRECTA = "La contraseña no es correcta.";
 
 function toText(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -44,9 +48,7 @@ function extractList(response: unknown): ApiRecord[] {
   return [];
 }
 
-/**
- * Arma sesión a partir de objetos `usuario` y `persona` (misma forma que POST /api/login/).
- */
+/** Arma sesión a partir de objetos `usuario` y `persona` anidados en `raw`. */
 export function normalizedUserFromLoginResponse(data: unknown): NormalizedUser {
   const root = asRecord(data);
   const usuario = asRecord(root?.usuario) ?? {};
@@ -65,9 +67,7 @@ export function normalizedUserFromLoginResponse(data: unknown): NormalizedUser {
     toText(usuario.correo);
 
   if (!email) {
-    throw new Error(
-      "La respuesta del login no incluye correo en persona ni en usuario.",
-    );
+    throw new Error(MSG_CORREO_NO_REGISTRADO);
   }
 
   const raw: Record<string, unknown> = {
@@ -94,7 +94,8 @@ export async function registerUser(input: RegisterInput): Promise<void> {
 }
 
 /**
- * Login vía GET (flujo pedido explícitamente): persona por email → usuario por id_persona → comparar contraseña en front.
+ * Login vía GET: persona por email → usuario por id_persona → comparar contraseña en front.
+ * Los textos de error los arma solo el front según listas vacías o coincidencia de contrasena.
  */
 export async function loginUser(
   emailOrUsername: string,
@@ -103,44 +104,68 @@ export async function loginUser(
   const normalizedEmail = emailOrUsername.trim().toLowerCase();
   const q = encodeURIComponent(normalizedEmail);
 
-  const personasRes = await httpClient.get<unknown>(`/api/personas/?email=${q}`);
-  const personas = extractList(personasRes);
-  const persona =
-    personas.find(
-      (p) =>
-        toText(p.email).toLowerCase() === normalizedEmail ||
-        toText(p.correo).toLowerCase() === normalizedEmail,
-    ) ?? personas[0];
+  let personasRes: unknown;
+  try {
+    personasRes = await httpClient.get<unknown>(`/api/personas/?email=${q}`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 0) {
+      throw error;
+    }
+    throw new Error(MSG_CORREO_NO_REGISTRADO);
+  }
 
+  const personas = extractList(personasRes);
+  if (personas.length === 0) {
+    throw new Error(MSG_CORREO_NO_REGISTRADO);
+  }
+
+  const personaMatch = personas.find(
+    (p) =>
+      toText(p.email).toLowerCase() === normalizedEmail ||
+      toText(p.correo).toLowerCase() === normalizedEmail,
+  );
+  const persona = personaMatch ?? (personas.length === 1 ? personas[0] : null);
   if (!persona) {
-    throw new Error("No existe un usuario registrado con ese correo.");
+    throw new Error(MSG_CORREO_NO_REGISTRADO);
   }
 
   const idPersona =
     persona.id_persona ?? persona.id ?? persona.pk ?? persona.idPersona;
   if (idPersona === undefined || idPersona === null || idPersona === "") {
-    throw new Error("No se pudo obtener id_persona para esta persona.");
+    throw new Error(MSG_CORREO_NO_REGISTRADO);
   }
 
-  const usuariosRes = await httpClient.get<unknown>(
-    `/api/usuarios/?id_persona=${encodeURIComponent(String(idPersona))}`,
-  );
+  let usuariosRes: unknown;
+  try {
+    usuariosRes = await httpClient.get<unknown>(
+      `/api/usuarios/?id_persona=${encodeURIComponent(String(idPersona))}`,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 0) {
+      throw error;
+    }
+    throw new Error(MSG_CORREO_NO_REGISTRADO);
+  }
+
   const usuarios = extractList(usuariosRes);
+  if (usuarios.length === 0) {
+    throw new Error(MSG_CORREO_NO_REGISTRADO);
+  }
+
   const usuario =
     usuarios.find((u) => String(u.id_persona ?? u.persona) === String(idPersona)) ??
-    usuarios[0];
+    (usuarios.length === 1 ? usuarios[0] : null);
 
   if (!usuario) {
-    throw new Error("No existe un usuario registrado con ese correo.");
+    throw new Error(MSG_CORREO_NO_REGISTRADO);
   }
 
-  const storedSecret =
-    toText(usuario.contrasena) ||
-    toText(usuario.password) ||
-    toText(usuario["contraseña"]);
-
-  if (storedSecret !== password) {
-    throw new Error("La contraseña no es correcta.");
+  const storedPlain = toText(usuario.contrasena);
+  if (!storedPlain) {
+    throw new Error(MSG_CONTRASENA_INCORRECTA);
+  }
+  if (storedPlain !== password) {
+    throw new Error(MSG_CONTRASENA_INCORRECTA);
   }
 
   return normalizedUserFromLoginResponse({ usuario, persona });
