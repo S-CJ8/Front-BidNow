@@ -991,123 +991,167 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
           )}
 
           {activeSection === "perfil" && (
-            <section className="space-y-6">
-              <div>
-                <h1 className="text-3xl font-bold">Mi Perfil</h1>
-                <p className="mt-2 text-white/70">
-                  Informacion de tu cuenta y reputacion dentro de la plataforma.
-                </p>
-              </div>
-
-              <div className="grid gap-5 lg:grid-cols-3">
-                <article className="rounded-2xl bg-[#141822] p-6 shadow-xl shadow-black/30 lg:col-span-1">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-orange/90">
-                      <User className="h-7 w-7" />
+            <section className="space-y-7">
+              <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+                <article className="rounded-sm border border-white/10 bg-[#0d1117] p-5 shadow-xl shadow-black/40 md:p-6">
+                  <div className="flex flex-wrap items-center gap-4 md:gap-5">
+                    <div className="h-20 w-20 overflow-hidden border-2 border-brand-orange bg-[#1a1d23]">
+                      <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_40%_35%,#5f7488,#0f141b)]">
+                        <User className="h-8 w-8 text-white/75" />
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xl font-semibold">{user.name}</p>
-                      <p className="text-sm text-white/70">{user.email}</p>
+                    <div className="min-w-[220px] flex-1">
+                      <p className="text-3xl font-bold uppercase tracking-wide text-white">
+                        {user.name}
+                      </p>
+                      <p className="mt-1 text-sm text-white/70">
+                        Miembro BidNow desde {formatDate(userMeta.joinedAt)}
+                      </p>
+                      <p className="mt-2 inline-flex items-center gap-1 text-sm text-brand-orange">
+                        <Star className="h-4 w-4 fill-current" />
+                        <Star className="h-4 w-4 fill-current" />
+                        <Star className="h-4 w-4 fill-current" />
+                        <Star className="h-4 w-4 fill-current" />
+                        <Star className="h-4 w-4 fill-current" />
+                        <span className="ml-1 text-white/85">
+                          {userMeta.rating} ({pujas.length} reseñas)
+                        </span>
+                      </p>
                     </div>
                   </div>
+                </article>
 
-                  <div className="mt-6 space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
-                    <p className="flex items-center justify-between">
-                      <span className="text-white/70">Calificacion</span>
-                      <span className="inline-flex items-center gap-1 font-semibold text-yellow-300">
-                        <Star className="h-4 w-4" /> {userMeta.rating}
-                      </span>
-                    </p>
-                    <p className="flex items-center justify-between">
-                      <span className="text-white/70">Estado</span>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          userMeta.isNew
-                            ? "bg-amber-500/20 text-amber-200"
-                            : "bg-emerald-500/20 text-emerald-200"
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+                  <MetricCardTerminal
+                    label="Total pujado"
+                    value={totalInvested}
+                    accent="text-white"
+                  />
+                  <MetricCardTerminal
+                    label="Subastas en vivo"
+                    value={String(liveSubastas.length)}
+                    accent="text-white"
+                  />
+                  <MetricCardTerminal
+                    label="Publicaciones"
+                    value={String(mySubastas.length)}
+                    accent="text-brand-orange"
+                  />
+                  <MetricCardTerminal
+                    label="Ofertas activas"
+                    value={String(pujas.length)}
+                    accent="text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-5 xl:grid-cols-[280px_1fr]">
+                <article className="rounded-sm border border-white/10 bg-[#0d1117] p-4 shadow-xl shadow-black/40">
+                  <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-brand-orange">
+                    Cuenta BidNow
+                  </p>
+                  <div className="space-y-2">
+                    {[
+                      "Dashboard",
+                      "Pujas activas",
+                      "Mi inventario",
+                      "Calendario",
+                      "Seguimiento",
+                      "Configuracion",
+                      "Soporte",
+                    ].map((item, idx) => (
+                      <div
+                        key={item}
+                        className={`flex items-center gap-2 border px-3 py-2 text-xs uppercase tracking-[0.16em] ${
+                          idx === 5
+                            ? "border-brand-orange bg-brand-orange text-black"
+                            : "border-white/10 bg-black/20 text-white/70"
                         }`}
                       >
-                        {userMeta.isNew ? "Usuario nuevo" : "Usuario activo"}
-                      </span>
-                    </p>
-                    <p className="flex items-center justify-between">
-                      <span className="text-white/70">Miembro hace</span>
-                      <span>{userMeta.daysAsMember} dias</span>
-                    </p>
-                  </div>
-                </article>
-
-                <article className="rounded-2xl bg-[#141822] p-6 shadow-xl shadow-black/30 lg:col-span-2">
-                  <h2 className="mb-4 text-xl font-semibold">Datos personales</h2>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <ProfileField label="Nombre completo" value={user.name} />
-                    <ProfileField label="Correo electronico" value={user.email} />
-                    <ProfileField
-                      label="ID de usuario"
-                      value={String(user.id ?? "Sin asignar")}
-                    />
-                    <ProfileField
-                      label="Fecha de registro"
-                      value={formatDate(userMeta.joinedAt)}
-                    />
-                    <ProfileField
-                      label="Ultimo acceso"
-                      value={formatDate(new Date())}
-                    />
-                    <ProfileField
-                      label="Seguridad"
-                      value="Cuenta protegida"
-                      icon={<ShieldCheck className="h-4 w-4 text-emerald-300" />}
-                    />
-                  </div>
-                </article>
-              </div>
-
-              <article className="rounded-2xl bg-[#141822] p-6 shadow-xl shadow-black/30">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-xl font-semibold">Mis Subastas</h2>
-                  <span className="rounded-full bg-brand-orange/20 px-3 py-1 text-xs font-semibold text-brand-orange">
-                    {mySubastas.length} publicadas
-                  </span>
-                </div>
-
-                {mySubastas.length === 0 ? (
-                  <p className="text-sm text-white/70">
-                    Aun no tienes subastas publicadas. Puedes crear una desde
-                    la opcion "Subir Articulo".
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {mySubastas.slice(0, 8).map((item) => (
-                      <article
-                        key={pickId(item)}
-                        className="rounded-xl border border-white/10 bg-black/20 p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="font-semibold">
-                            {pickText(item, ["titulo", "title", "nombre"]) ||
-                              "Subasta"}
-                          </p>
-                          <p className="text-brand-orange">
-                            {formatCurrency(
-                              pickNumber(item, [
-                                "precio_actual",
-                                "precio_inicial",
-                                "precio",
-                              ]),
-                            )}
-                          </p>
-                        </div>
-                        <p className="mt-2 text-sm text-white/70">
-                          Estado:{" "}
-                          {pickText(item, ["estado", "status", "estado_subasta"]) ||
-                            "Sin estado"}
-                        </p>
-                      </article>
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        {item}
+                      </div>
                     ))}
                   </div>
-                )}
-              </article>
+                </article>
+
+                <div className="space-y-5">
+                  <article className="rounded-sm border border-white/10 bg-[#0d1117] p-6 shadow-xl shadow-black/40">
+                    <h2 className="mb-4 text-xl font-semibold uppercase tracking-wide">
+                      Panel de perfil
+                    </h2>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <ProfileField label="Nombre completo" value={user.name} />
+                      <ProfileField label="Correo electronico" value={user.email} />
+                      <ProfileField
+                        label="ID de usuario"
+                        value={String(user.id ?? "Sin asignar")}
+                      />
+                      <ProfileField
+                        label="Fecha de registro"
+                        value={formatDate(userMeta.joinedAt)}
+                      />
+                      <ProfileField
+                        label="Ultimo acceso"
+                        value={formatDate(new Date())}
+                      />
+                      <ProfileField
+                        label="Seguridad"
+                        value="Cuenta protegida"
+                        icon={<ShieldCheck className="h-4 w-4 text-emerald-300" />}
+                      />
+                    </div>
+                  </article>
+
+                  <article className="rounded-sm border border-white/10 bg-[#0d1117] p-6 shadow-xl shadow-black/40">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <h2 className="text-xl font-semibold uppercase tracking-wide">
+                        Mis subastas
+                      </h2>
+                      <span className="border border-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-brand-orange">
+                        {mySubastas.length} publicadas
+                      </span>
+                    </div>
+
+                    {mySubastas.length === 0 ? (
+                      <p className="text-sm text-white/70">
+                        Aun no tienes subastas publicadas. Puedes crear una desde
+                        la opcion "Subir Articulo".
+                      </p>
+                    ) : (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {mySubastas.slice(0, 6).map((item) => (
+                          <article
+                            key={pickId(item)}
+                            className="border border-white/10 bg-black/30 p-4"
+                          >
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brand-orange">
+                              Activa
+                            </p>
+                            <p className="mt-2 text-base font-semibold">
+                              {pickText(item, ["titulo", "title", "nombre"]) || "Subasta"}
+                            </p>
+                            <p className="mt-2 text-sm text-white/65">
+                              Estado:{" "}
+                              {pickText(item, ["estado", "status", "estado_subasta"]) ||
+                                "Sin estado"}
+                            </p>
+                            <p className="mt-3 text-xl font-bold text-brand-orange">
+                              {formatCurrency(
+                                pickNumber(item, [
+                                  "precio_actual",
+                                  "precio_inicial",
+                                  "precio",
+                                ]),
+                              )}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                </div>
+              </div>
             </section>
           )}
 
@@ -1432,12 +1476,29 @@ function ProfileField({
   icon?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-      <p className="mb-1 text-sm text-white/65">{label}</p>
+    <div className="border border-white/10 bg-black/20 p-4">
+      <p className="mb-1 text-[11px] uppercase tracking-[0.14em] text-white/55">{label}</p>
       <p className="inline-flex items-center gap-2 text-base font-medium">
         {icon}
         {value}
       </p>
     </div>
+  );
+}
+
+function MetricCardTerminal({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <article className="border border-white/10 bg-[#0d1117] p-4 shadow-lg shadow-black/40">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-white/55">{label}</p>
+      <p className={`mt-2 text-2xl font-bold ${accent}`}>{value}</p>
+    </article>
   );
 }
