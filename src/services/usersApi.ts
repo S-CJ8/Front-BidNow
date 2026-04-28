@@ -5,7 +5,7 @@ export type NormalizedUser = {
   name: string;
   email: string;
   password?: string;
-  /** Respuesta de login: modelo usuario (DRF). */
+  /** Modelo usuario + persona combinados tras login. */
   raw: Record<string, unknown>;
 };
 
@@ -14,6 +14,8 @@ type RegisterInput = {
   email: string;
   password: string;
 };
+
+type ApiRecord = Record<string, unknown>;
 
 function toText(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -26,9 +28,24 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function extractList(response: unknown): ApiRecord[] {
+  if (Array.isArray(response)) {
+    return response as ApiRecord[];
+  }
+  if (response && typeof response === "object") {
+    const r = response as Record<string, unknown>;
+    if (Array.isArray(r.results)) {
+      return r.results as ApiRecord[];
+    }
+    if (Array.isArray(r.data)) {
+      return r.data as ApiRecord[];
+    }
+  }
+  return [];
+}
+
 /**
- * POST /api/login/ → { usuario, persona }
- * Estado de sesión: datos combinados para que el dashboard siga leyendo id / nombre / correo.
+ * Arma sesión a partir de objetos `usuario` y `persona` (misma forma que POST /api/login/).
  */
 export function normalizedUserFromLoginResponse(data: unknown): NormalizedUser {
   const root = asRecord(data);
@@ -76,14 +93,55 @@ export async function registerUser(input: RegisterInput): Promise<void> {
   });
 }
 
+/**
+ * Login vía GET (flujo pedido explícitamente): persona por email → usuario por id_persona → comparar contraseña en front.
+ */
 export async function loginUser(
   emailOrUsername: string,
   password: string,
 ): Promise<NormalizedUser> {
   const normalizedEmail = emailOrUsername.trim().toLowerCase();
-  const data = await httpClient.post<unknown>("/api/login/", {
-    email: normalizedEmail,
-    password,
-  });
-  return normalizedUserFromLoginResponse(data);
+  const q = encodeURIComponent(normalizedEmail);
+
+  const personasRes = await httpClient.get<unknown>(`/api/personas/?email=${q}`);
+  const personas = extractList(personasRes);
+  const persona =
+    personas.find(
+      (p) =>
+        toText(p.email).toLowerCase() === normalizedEmail ||
+        toText(p.correo).toLowerCase() === normalizedEmail,
+    ) ?? personas[0];
+
+  if (!persona) {
+    throw new Error("No existe un usuario registrado con ese correo.");
+  }
+
+  const idPersona =
+    persona.id_persona ?? persona.id ?? persona.pk ?? persona.idPersona;
+  if (idPersona === undefined || idPersona === null || idPersona === "") {
+    throw new Error("No se pudo obtener id_persona para esta persona.");
+  }
+
+  const usuariosRes = await httpClient.get<unknown>(
+    `/api/usuarios/?id_persona=${encodeURIComponent(String(idPersona))}`,
+  );
+  const usuarios = extractList(usuariosRes);
+  const usuario =
+    usuarios.find((u) => String(u.id_persona ?? u.persona) === String(idPersona)) ??
+    usuarios[0];
+
+  if (!usuario) {
+    throw new Error("No existe un usuario registrado con ese correo.");
+  }
+
+  const storedSecret =
+    toText(usuario.contrasena) ||
+    toText(usuario.password) ||
+    toText(usuario["contraseña"]);
+
+  if (storedSecret !== password) {
+    throw new Error("La contraseña no es correcta.");
+  }
+
+  return normalizedUserFromLoginResponse({ usuario, persona });
 }
