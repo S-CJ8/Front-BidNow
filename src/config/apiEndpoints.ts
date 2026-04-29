@@ -8,6 +8,7 @@
 export const apiEndpoints = {
   /** Auth fuera del router de recursos */
   registro: "/api/registro/",
+  login: "/api/login/",
 
   /** Listados con filtros opcionales documentados en el back */
   personas: "/api/personas/",
