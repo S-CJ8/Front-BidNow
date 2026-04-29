@@ -1,5 +1,6 @@
 /**
- * Rutas del API Django (DRF). Base real: `FRONTEND_API_BASE_URL` / `VITE_API_BASE_URL` en `httpClient`.
+ * Rutas del API Django (DRF). Base del API (ej. `https://back-bidnow.onrender.com/api`):
+ * `VITE_API_BASE_URL`, `FRONTEND_API_BASE_URL` o `REACT_APP_API_URL` en `httpClient`.
  *
  * Patrón CRUD por recurso: GET|POST /api/<recurso>/ y GET|PUT|PATCH|DELETE /api/<recurso>/{pk}/
  */

@@ -1,6 +1,16 @@
+/**
+ * Base del API del back (sin path extra después de `/api`).
+ * Ejemplo: `https://back-bidnow.onrender.com/api`
+ *
+ * En `.env` o variables de Render, define una de:
+ * - `VITE_API_BASE_URL` (recomendado en Vite)
+ * - `FRONTEND_API_BASE_URL`
+ * - `REACT_APP_API_URL` (nombre típico de CRA; aquí expuesto vía `envPrefix` en vite.config)
+ */
 const API_BASE_URL =
-  (import.meta.env.FRONTEND_API_BASE_URL as string | undefined)?.trim() ||
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
+  (import.meta.env.FRONTEND_API_BASE_URL as string | undefined)?.trim() ||
+  (import.meta.env.REACT_APP_API_URL as string | undefined)?.trim() ||
   "https://back-bidnow.onrender.com/api";
 
 export class ApiError extends Error {

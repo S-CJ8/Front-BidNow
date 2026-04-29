@@ -3,7 +3,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  envPrefix: ["VITE_", "FRONTEND_"],
+  /** Expone al cliente variables de entorno con estos prefijos (base del API = …/api). */
+  envPrefix: ["VITE_", "FRONTEND_", "REACT_APP_"],
   server: {
     port: 5173,
     open: true,
