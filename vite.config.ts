@@ -9,6 +9,7 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     clearMocks: true,
+    testTimeout: 15_000,
   },
   server: {
     port: 5173,

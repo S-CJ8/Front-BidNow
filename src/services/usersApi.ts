@@ -34,7 +34,8 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 /**
- * Normaliza listados DRF y formas raras (`personas`, objeto único, etc.).
+ * Normaliza listados DRF, envoltorios `value`/`Value` (p. ej. .NET) y objeto único.
+ * Persona suelta puede venir solo con `id_persona` (sin `id`/`pk`).
  */
 function extractList(response: unknown): ApiRecord[] {
   if (Array.isArray(response)) {
@@ -50,12 +51,25 @@ function extractList(response: unknown): ApiRecord[] {
   if (Array.isArray(r.data)) {
     return r.data as ApiRecord[];
   }
-  for (const key of ["personas", "usuarios", "items", "records"]) {
+  for (const key of [
+    "value",
+    "Value",
+    "personas",
+    "usuarios",
+    "items",
+    "Items",
+    "records",
+  ]) {
     if (Array.isArray(r[key])) {
       return r[key] as ApiRecord[];
     }
   }
-  if (r.id !== undefined || r.pk !== undefined) {
+  if (
+    r.id !== undefined ||
+    r.pk !== undefined ||
+    r.id_persona !== undefined ||
+    r.id_usuario !== undefined
+  ) {
     return [r as ApiRecord];
   }
   return [];
@@ -88,7 +102,7 @@ async function fetchPersonasByEmail(rawTrimmed: string): Promise<ApiRecord[]> {
       try {
         const res = await httpClient.get<unknown>(personasListUrl(filter, value));
         for (const p of extractList(res)) {
-          const pk = p.id ?? p.pk;
+          const pk = p.id ?? p.pk ?? p.id_persona;
           if (pk !== undefined && pk !== null && pk !== "") {
             byPk.set(String(pk), p);
           }
@@ -103,9 +117,9 @@ async function fetchPersonasByEmail(rawTrimmed: string): Promise<ApiRecord[]> {
   return [...byPk.values()];
 }
 
-/** PK de persona enlazada a `usuario.id_persona` (en Django suele ser `persona.id`). */
+/** PK de persona para `GET /api/usuarios/?id_persona=` (`id`, `pk` o `id_persona` según serializer). */
 function getPersonaPk(persona: ApiRecord): string | number | null {
-  const pk = persona.id ?? persona.pk;
+  const pk = persona.id ?? persona.pk ?? persona.id_persona;
   if (pk !== undefined && pk !== null && pk !== "") {
     return pk as string | number;
   }
@@ -121,14 +135,18 @@ function usuarioLinkedToPersonaPk(u: ApiRecord, personaPk: string | number): boo
     }
   }
   const nested = u.persona;
-  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+  if (nested === undefined || nested === null) {
+    return false;
+  }
+  if (typeof nested === "object" && !Array.isArray(nested)) {
     const p = nested as ApiRecord;
-    const id = p.id ?? p.pk;
+    const id = p.id ?? p.pk ?? p.id_persona;
     if (id !== undefined && id !== null && String(id) === target) {
       return true;
     }
+    return false;
   }
-  return false;
+  return String(nested) === target;
 }
 
 function isUsuarioFilteredByIdentityUrl(url: string): boolean {
