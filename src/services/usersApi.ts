@@ -33,18 +33,30 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+/**
+ * Normaliza listados DRF y formas raras (`personas`, objeto único, etc.).
+ */
 function extractList(response: unknown): ApiRecord[] {
   if (Array.isArray(response)) {
     return response as ApiRecord[];
   }
-  if (response && typeof response === "object") {
-    const r = response as Record<string, unknown>;
-    if (Array.isArray(r.results)) {
-      return r.results as ApiRecord[];
+  if (!response || typeof response !== "object") {
+    return [];
+  }
+  const r = response as Record<string, unknown>;
+  if (Array.isArray(r.results)) {
+    return r.results as ApiRecord[];
+  }
+  if (Array.isArray(r.data)) {
+    return r.data as ApiRecord[];
+  }
+  for (const key of ["personas", "usuarios", "items", "records"]) {
+    if (Array.isArray(r[key])) {
+      return r[key] as ApiRecord[];
     }
-    if (Array.isArray(r.data)) {
-      return r.data as ApiRecord[];
-    }
+  }
+  if (r.id !== undefined || r.pk !== undefined) {
+    return [r as ApiRecord];
   }
   return [];
 }
@@ -60,21 +72,31 @@ function personaMatchesIdentity(p: ApiRecord, normalizedEmail: string): boolean 
   );
 }
 
-/** Une resultados de ?email=, ?correo= e ?identidad= (misma persona puede aparecer en varios filtros). */
-async function fetchPersonasByEmail(normalizedEmail: string): Promise<ApiRecord[]> {
+/** Valores a probar en query (?email=, etc.): minúsculas y tal cual el usuario escribió (trim). */
+function emailQueryVariants(rawTrimmed: string): string[] {
+  const lower = rawTrimmed.toLowerCase();
+  return lower === rawTrimmed ? [lower] : [lower, rawTrimmed];
+}
+
+/** Une resultados de ?email=, ?correo= e ?identidad= con variantes de mayúsculas. */
+async function fetchPersonasByEmail(rawTrimmed: string): Promise<ApiRecord[]> {
   const byPk = new Map<string, ApiRecord>();
-  for (const filter of ["email", "correo", "identidad"] as const) {
-    try {
-      const res = await httpClient.get<unknown>(personasListUrl(filter, normalizedEmail));
-      for (const p of extractList(res)) {
-        const pk = p.id ?? p.pk;
-        if (pk !== undefined && pk !== null && pk !== "") {
-          byPk.set(String(pk), p);
+  const variants = emailQueryVariants(rawTrimmed);
+
+  for (const value of variants) {
+    for (const filter of ["email", "correo", "identidad"] as const) {
+      try {
+        const res = await httpClient.get<unknown>(personasListUrl(filter, value));
+        for (const p of extractList(res)) {
+          const pk = p.id ?? p.pk;
+          if (pk !== undefined && pk !== null && pk !== "") {
+            byPk.set(String(pk), p);
+          }
         }
-      }
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 0) {
-        throw error;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 0) {
+          throw error;
+        }
       }
     }
   }
@@ -90,32 +112,59 @@ function getPersonaPk(persona: ApiRecord): string | number | null {
   return null;
 }
 
+function usuarioLinkedToPersonaPk(u: ApiRecord, personaPk: string | number): boolean {
+  const target = String(personaPk);
+  const flat = [u.id_persona, u.persona_id, u.idPersona];
+  for (const c of flat) {
+    if (c !== undefined && c !== null && String(c) === target) {
+      return true;
+    }
+  }
+  const nested = u.persona;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const p = nested as ApiRecord;
+    const id = p.id ?? p.pk;
+    if (id !== undefined && id !== null && String(id) === target) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isUsuarioFilteredByIdentityUrl(url: string): boolean {
+  return /[?](email|correo|identidad)=/.test(url);
+}
+
 /**
- * Busca usuario enlazado: `id_persona`, luego listados por `email`, `correo` o `identidad`
- * y se filtra por FK hacia la persona cuando hace falta.
+ * Busca usuario: por `id_persona`, luego por filtros de correo/identidad.
+ * Si el back devuelve **una sola** fila en un listado ya filtrado por correo, se acepta aunque no venga `id_persona` en el JSON.
  */
 async function fetchUsuarioForPersona(
   personaPk: string | number,
-  normalizedEmail: string,
+  rawTrimmedEmail: string,
 ): Promise<ApiRecord | null> {
-  const attempts = [
-    usuariosListUrl("id_persona", personaPk),
-    usuariosListUrl("email", normalizedEmail),
-    usuariosListUrl("correo", normalizedEmail),
-    usuariosListUrl("identidad", normalizedEmail),
-  ];
+  const variants = emailQueryVariants(rawTrimmedEmail);
+  const attempts: string[] = [usuariosListUrl("id_persona", personaPk)];
+  for (const v of variants) {
+    attempts.push(
+      usuariosListUrl("email", v),
+      usuariosListUrl("correo", v),
+      usuariosListUrl("identidad", v),
+    );
+  }
 
   for (const url of attempts) {
     try {
       const res = await httpClient.get<unknown>(url);
       const list = extractList(res);
-      const linked = list.filter(
-        (u) => String(u.id_persona ?? u.persona ?? "") === String(personaPk),
-      );
+      const linked = list.filter((u) => usuarioLinkedToPersonaPk(u, personaPk));
       if (linked.length >= 1) {
         return linked[0];
       }
       if (url.includes("id_persona") && list.length === 1) {
+        return list[0];
+      }
+      if (isUsuarioFilteredByIdentityUrl(url) && list.length === 1) {
         return list[0];
       }
     } catch (error) {
@@ -175,16 +224,16 @@ export async function registerUser(input: RegisterInput): Promise<void> {
 }
 
 /**
- * Login vía GET: listar persona por email/correo, luego usuario por id_persona (y respaldos email/correo en listado),
- * comparar `contrasena` en el front. Mensajes de error los arma solo el front.
+ * Login vía GET: persona → usuario → comparar `contrasena` en el front.
  */
 export async function loginUser(
   emailOrUsername: string,
   password: string,
 ): Promise<NormalizedUser> {
-  const normalizedEmail = emailOrUsername.trim().toLowerCase();
+  const rawTrimmed = emailOrUsername.trim();
+  const normalizedEmail = rawTrimmed.toLowerCase();
 
-  const personas = await fetchPersonasByEmail(normalizedEmail);
+  const personas = await fetchPersonasByEmail(rawTrimmed);
   if (personas.length === 0) {
     throw new Error(MSG_CORREO_NO_REGISTRADO);
   }
@@ -201,16 +250,17 @@ export async function loginUser(
     throw new Error(MSG_CORREO_NO_REGISTRADO);
   }
 
-  const usuario = await fetchUsuarioForPersona(personaPk, normalizedEmail);
+  const usuario = await fetchUsuarioForPersona(personaPk, rawTrimmed);
   if (!usuario) {
     throw new Error(MSG_CORREO_NO_REGISTRADO);
   }
 
-  const storedPlain = toText(usuario.contrasena);
+  const storedPlain = toText(usuario.contrasena).trim();
+  const passwordTrimmed = password.trim();
   if (!storedPlain) {
     throw new Error(MSG_CONTRASENA_INCORRECTA);
   }
-  if (storedPlain !== password) {
+  if (storedPlain !== passwordTrimmed) {
     throw new Error(MSG_CONTRASENA_INCORRECTA);
   }
 
