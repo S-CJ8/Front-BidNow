@@ -3,14 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  /** Expone al cliente variables de entorno con estos prefijos (base del API = …/api). */
-  envPrefix: ["VITE_", "FRONTEND_", "REACT_APP_"],
-  test: {
-    environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}"],
-    clearMocks: true,
-    testTimeout: 15_000,
-  },
+  envPrefix: ["VITE_", "FRONTEND_"],
   server: {
     port: 5173,
     open: true,

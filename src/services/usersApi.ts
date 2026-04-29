@@ -1,12 +1,10 @@
-import { apiEndpoints } from "../config/apiEndpoints";
-import { httpClient } from "../lib/httpClient";
+import { usuariosService } from "./apiServices";
 
 export type NormalizedUser = {
   id?: number | string;
   name: string;
   email: string;
   password?: string;
-  /** Modelo usuario + persona combinados tras login. */
   raw: Record<string, unknown>;
 };
 
@@ -20,74 +18,94 @@ function toText(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+function normalizeUser(raw: unknown): NormalizedUser | null {
+  if (!raw || typeof raw !== "object") {
     return null;
   }
-  return value as Record<string, unknown>;
-}
-
-const MSG_CORREO_NO_REGISTRADO = "No existe un usuario registrado con ese correo.";
-
-/** Arma sesión a partir de `usuario` y `persona` en la respuesta de `POST /api/login/`. */
-export function normalizedUserFromLoginResponse(data: unknown): NormalizedUser {
-  const root = asRecord(data);
-  const usuario = asRecord(root?.usuario) ?? {};
-  const persona = asRecord(root?.persona) ?? {};
-
-  const id = usuario.id ?? usuario.id_usuario ?? usuario.pk;
+  const record = raw as Record<string, unknown>;
+  const id = record.id ?? record.id_usuario;
   const name =
-    toText(persona.nombre) ||
-    toText(persona.nombres) ||
-    toText(usuario.nombre) ||
-    "Usuario";
-  const email =
-    toText(persona.correo) ||
-    toText(persona.email) ||
-    toText(persona.identidad) ||
-    toText(usuario.email) ||
-    toText(usuario.correo) ||
-    toText(usuario.identidad);
+    toText(record.nombre) ||
+    toText(record.nombre_usuario) ||
+    toText(record.username) ||
+    toText(record.name) ||
+    toText(record.nombres);
+  const email = toText(record.email) || toText(record.correo);
+  const password =
+    toText(record.password) ||
+    toText(record.contrasena) ||
+    toText(record["contraseña"]);
 
   if (!email) {
-    throw new Error(MSG_CORREO_NO_REGISTRADO);
+    return null;
   }
-
-  const raw: Record<string, unknown> = {
-    ...persona,
-    ...usuario,
-    usuario,
-    persona,
-  };
-
   return {
     id: typeof id === "number" || typeof id === "string" ? id : undefined,
-    name,
+    name: name || "Usuario",
     email,
-    raw,
+    password: password || undefined,
+    raw: record,
   };
+}
+
+function looksHashedPassword(value: string): boolean {
+  return value.length >= 20 || value.includes("$") || /^[a-f0-9]{32,}$/i.test(value);
 }
 
 export async function registerUser(input: RegisterInput): Promise<void> {
-  await httpClient.post(apiEndpoints.registro, {
-    nombre: input.name.trim(),
-    email: input.email.trim(),
-    password: input.password,
-  });
+  const payloadCandidates: Record<string, unknown>[] = [
+    { nombre: input.name, email: input.email, password: input.password },
+    { username: input.name, email: input.email, password: input.password },
+    {
+      nombre_usuario: input.name,
+      correo: input.email,
+      contrasena: input.password,
+    },
+    {
+      nombre_usuario: input.name,
+      email: input.email,
+      password: input.password,
+    },
+  ];
+
+  let lastError: Error | null = null;
+  for (const payload of payloadCandidates) {
+    try {
+      await usuariosService.create(payload);
+      return;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Error desconocido");
+    }
+  }
+  throw (
+    lastError ||
+    new Error("No fue posible crear el usuario con los formatos soportados.")
+  );
 }
 
-/**
- * `POST /api/login/` con JSON `{ "email", "password" }`.
- * El back también acepta `{ "identidad", "contrasena" }`; este formulario usa email/clave en UI y mapea a email/password.
- */
 export async function loginUser(
   emailOrUsername: string,
   password: string,
 ): Promise<NormalizedUser> {
-  const email = emailOrUsername.trim().toLowerCase();
-  const data = await httpClient.post<unknown>(apiEndpoints.login, {
-    email,
-    password,
-  });
-  return normalizedUserFromLoginResponse(data);
+  const users = await usuariosService.list();
+  const normalizedInput = emailOrUsername.trim().toLowerCase();
+
+  const selected = users
+    .map(normalizeUser)
+    .filter((user): user is NormalizedUser => Boolean(user))
+    .find((user) => user.email.trim().toLowerCase() === normalizedInput);
+
+  if (!selected) {
+    throw new Error("No existe un usuario registrado con ese correo.");
+  }
+
+  if (
+    selected.password &&
+    !looksHashedPassword(selected.password) &&
+    selected.password !== password
+  ) {
+    throw new Error("Contraseña incorrecta.");
+  }
+
+  return selected;
 }

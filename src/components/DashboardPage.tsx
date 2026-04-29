@@ -1,5 +1,6 @@
 import {
   Bell,
+  ChartColumnBig,
   Clock3,
   Gavel,
   LayoutDashboard,
@@ -493,8 +494,7 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-black p-2 text-white md:p-3">
-      <div className="min-h-[calc(100vh-16px)] overflow-hidden rounded-[26px] border-4 border-[#8f9aac] bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.12)] md:min-h-[calc(100vh-24px)]">
+    <div className="min-h-screen bg-[#13233b] text-white">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-black/95">
         <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-4 py-4 md:px-8">
           <p className="shrink-0 font-serif text-lg text-brand-orange md:text-2xl">
@@ -537,15 +537,7 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
       </header>
 
       <div className="mx-auto flex w-full max-w-[1400px]">
-        <aside className="hidden min-h-[calc(100vh-73px)] w-64 shrink-0 border-r border-white/10 bg-[#080b10] p-4 md:block">
-          <div className="mb-4 border border-white/10 bg-black/40 px-3 py-3">
-            <p className="text-sm font-bold uppercase tracking-[0.14em] text-white">
-              Trader Terminal
-            </p>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-white/40">
-              BidNow Pro Account
-            </p>
-          </div>
+        <aside className="hidden min-h-[calc(100vh-73px)] w-64 shrink-0 border-r border-white/10 bg-[#10141e] p-4 md:block">
           <nav className="space-y-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -555,10 +547,10 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                   key={item.id}
                   type="button"
                   onClick={() => setActiveSection(item.id)}
-                  className={`flex w-full items-center gap-3 border px-4 py-3 text-left text-sm uppercase tracking-[0.12em] transition ${
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-lg transition ${
                     isActive
-                      ? "border-brand-orange bg-brand-orange text-black"
-                      : "border-white/10 text-white/80 hover:bg-white/10 hover:text-white"
+                      ? "bg-brand-orange text-white"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
@@ -592,34 +584,42 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
           {activeSection === "dashboard" && (
             <section className="space-y-8">
-              <div>
-                <h1 className="text-5xl font-bold uppercase leading-[0.95] tracking-tight text-white">
-                  Live
-                  <br />
-                  Auctions
-                </h1>
-                <p className="mt-2 text-sm text-white/60">Trading en tiempo real en BidNow</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {["All Items", "Electronics", "Fashion", "Home", "Collectibles"].map(
-                    (category, idx) => (
-                      <button
-                        key={category}
-                        type="button"
-                        className={`border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                          idx === 0
-                            ? "border-brand-orange bg-brand-orange text-black"
-                            : "border-white/20 text-white/75"
-                        }`}
-                      >
-                        {category}
-                      </button>
-                    ),
-                  )}
-                </div>
+              <h1 className="text-2xl font-bold">Panel principal</h1>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <article className="rounded-2xl bg-[#141822] p-5 shadow-lg shadow-black/30">
+                  <TrendingValue
+                    value={String(pujas.length)}
+                    label="Ofertas activas"
+                    accent="text-emerald-400"
+                  />
+                </article>
+                <article className="rounded-2xl bg-[#141822] p-5 shadow-lg shadow-black/30">
+                  <TrendingValue
+                    value={String(liveSubastas.length)}
+                    label="Subastas en vivo"
+                    accent="text-blue-400"
+                  />
+                </article>
+                <article className="rounded-2xl bg-[#141822] p-5 shadow-lg shadow-black/30">
+                  <TrendingValue
+                    value={totalInvested}
+                    label="Total invertido"
+                    accent="text-yellow-400"
+                  />
+                </article>
+                <article className="rounded-2xl bg-[#141822] p-5 shadow-lg shadow-black/30">
+                  <TrendingValue
+                    value={String(transacciones.length)}
+                    label="Transacciones"
+                    accent="text-violet-400"
+                  />
+                </article>
               </div>
 
               <div>
-                <div className="grid gap-4 lg:grid-cols-3">
+                <h2 className="mb-3 text-2xl font-semibold">Subastas en vivo</h2>
+                <p className="mb-5 text-white/70">Participa ahora en tiempo real</p>
+                <div className="grid gap-5 lg:grid-cols-3">
                   {loadState.loading && (
                     <p className="text-sm text-white/70">Cargando subastas...</p>
                   )}
@@ -631,30 +631,29 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                   {featuredAuctions.map((auction) => (
                     <article
                       key={auction.id}
-                      className="overflow-hidden border border-white/15 bg-[#0f1319] shadow-xl shadow-black/40"
+                      className="overflow-hidden rounded-2xl bg-[#121722] shadow-xl shadow-black/40"
                     >
-                      <div className="relative h-44 border-b border-white/10">
+                      <div className="relative h-44">
                         <img
                           src={auction.image}
                           alt={auction.title}
                           className="h-full w-full object-cover"
                         />
-                        <span className="absolute left-3 top-3 bg-brand-orange px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-black">
+                        <span className="absolute left-3 top-3 rounded-full bg-brand-orange px-3 py-1 text-xs font-semibold">
                           {auction.category}
                         </span>
-                        <span className="absolute right-3 top-3 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-black">
-                          Live
+                        <span className="absolute right-3 top-3 rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold">
+                          EN VIVO
                         </span>
                       </div>
                       <div className="space-y-3 p-4">
-                        <p className="text-[10px] uppercase tracking-[0.14em] text-white/50">
-                          Current Bid
-                        </p>
-                        <p className="text-4xl font-bold leading-none text-white">{auction.price}</p>
-                        <h3 className="line-clamp-2 text-2xl font-semibold">{auction.title}</h3>
-                        <div className="flex items-center justify-between text-xs uppercase tracking-[0.12em] text-white/70">
-                          <span>{auction.timeLeft}</span>
-                          <span>{String(auction.id).slice(-4)}</span>
+                        <h3 className="line-clamp-2 text-xl font-semibold">{auction.title}</h3>
+                        <div className="flex items-center justify-between text-white/80">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock3 className="h-4 w-4 text-brand-orange" />
+                            {auction.timeLeft}
+                          </span>
+                          <span className="font-semibold text-brand-orange">{auction.price}</span>
                         </div>
                         <button
                           type="button"
@@ -662,9 +661,9 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                             setSelectedAuctionId(auction.id);
                             setActiveSection("comprar");
                           }}
-                          className="w-full border border-brand-orange bg-brand-orange py-3 text-sm font-black uppercase tracking-[0.12em] text-black transition hover:brightness-110"
+                          className="w-full rounded-xl bg-brand-orange py-3 font-bold transition hover:brightness-110"
                         >
-                          Place Bid
+                          Ver Subasta en Vivo
                         </button>
                       </div>
                     </article>
@@ -672,29 +671,6 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 </div>
               </div>
 
-              <article className="border border-white/10 bg-[#0e1218] p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-3xl font-bold uppercase">Your Activity</h2>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-orange"
-                  >
-                    View History
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-3 border-b border-white/10 pb-2 text-[10px] uppercase tracking-[0.14em] text-white/45">
-                  <p>Auction Item</p>
-                  <p>Your Last Bid</p>
-                  <p>Status</p>
-                  <p className="text-right">Action</p>
-                </div>
-                <div className="mt-3 grid grid-cols-4 gap-3 text-sm">
-                  <p className="text-white/85">{featuredAuctions[0]?.title || "Sin actividad"}</p>
-                  <p className="text-white">{featuredAuctions[0]?.price || "$0"}</p>
-                  <p className="text-brand-orange">Pendiente</p>
-                  <p className="text-right text-white/75">Seguimiento</p>
-                </div>
-              </article>
             </section>
           )}
 
@@ -1015,167 +991,123 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
           )}
 
           {activeSection === "perfil" && (
-            <section className="space-y-7">
-              <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-                <article className="rounded-sm border border-white/10 bg-[#0d1117] p-5 shadow-xl shadow-black/40 md:p-6">
-                  <div className="flex flex-wrap items-center gap-4 md:gap-5">
-                    <div className="h-20 w-20 overflow-hidden border-2 border-brand-orange bg-[#1a1d23]">
-                      <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_40%_35%,#5f7488,#0f141b)]">
-                        <User className="h-8 w-8 text-white/75" />
-                      </div>
-                    </div>
-                    <div className="min-w-[220px] flex-1">
-                      <p className="text-3xl font-bold uppercase tracking-wide text-white">
-                        {user.name}
-                      </p>
-                      <p className="mt-1 text-sm text-white/70">
-                        Miembro BidNow desde {formatDate(userMeta.joinedAt)}
-                      </p>
-                      <p className="mt-2 inline-flex items-center gap-1 text-sm text-brand-orange">
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <span className="ml-1 text-white/85">
-                          {userMeta.rating} ({pujas.length} reseñas)
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                </article>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
-                  <MetricCardTerminal
-                    label="Total pujado"
-                    value={totalInvested}
-                    accent="text-white"
-                  />
-                  <MetricCardTerminal
-                    label="Subastas en vivo"
-                    value={String(liveSubastas.length)}
-                    accent="text-white"
-                  />
-                  <MetricCardTerminal
-                    label="Publicaciones"
-                    value={String(mySubastas.length)}
-                    accent="text-brand-orange"
-                  />
-                  <MetricCardTerminal
-                    label="Ofertas activas"
-                    value={String(pujas.length)}
-                    accent="text-white"
-                  />
-                </div>
+            <section className="space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold">Mi Perfil</h1>
+                <p className="mt-2 text-white/70">
+                  Informacion de tu cuenta y reputacion dentro de la plataforma.
+                </p>
               </div>
 
-              <div className="grid gap-5 xl:grid-cols-[280px_1fr]">
-                <article className="rounded-sm border border-white/10 bg-[#0d1117] p-4 shadow-xl shadow-black/40">
-                  <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-brand-orange">
-                    Cuenta BidNow
-                  </p>
-                  <div className="space-y-2">
-                    {[
-                      "Dashboard",
-                      "Pujas activas",
-                      "Mi inventario",
-                      "Calendario",
-                      "Seguimiento",
-                      "Configuracion",
-                      "Soporte",
-                    ].map((item, idx) => (
-                      <div
-                        key={item}
-                        className={`flex items-center gap-2 border px-3 py-2 text-xs uppercase tracking-[0.16em] ${
-                          idx === 5
-                            ? "border-brand-orange bg-brand-orange text-black"
-                            : "border-white/10 bg-black/20 text-white/70"
+              <div className="grid gap-5 lg:grid-cols-3">
+                <article className="rounded-2xl bg-[#141822] p-6 shadow-xl shadow-black/30 lg:col-span-1">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-orange/90">
+                      <User className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <p className="text-xl font-semibold">{user.name}</p>
+                      <p className="text-sm text-white/70">{user.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
+                    <p className="flex items-center justify-between">
+                      <span className="text-white/70">Calificacion</span>
+                      <span className="inline-flex items-center gap-1 font-semibold text-yellow-300">
+                        <Star className="h-4 w-4" /> {userMeta.rating}
+                      </span>
+                    </p>
+                    <p className="flex items-center justify-between">
+                      <span className="text-white/70">Estado</span>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          userMeta.isNew
+                            ? "bg-amber-500/20 text-amber-200"
+                            : "bg-emerald-500/20 text-emerald-200"
                         }`}
                       >
-                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                        {item}
-                      </div>
-                    ))}
+                        {userMeta.isNew ? "Usuario nuevo" : "Usuario activo"}
+                      </span>
+                    </p>
+                    <p className="flex items-center justify-between">
+                      <span className="text-white/70">Miembro hace</span>
+                      <span>{userMeta.daysAsMember} dias</span>
+                    </p>
                   </div>
                 </article>
 
-                <div className="space-y-5">
-                  <article className="rounded-sm border border-white/10 bg-[#0d1117] p-6 shadow-xl shadow-black/40">
-                    <h2 className="mb-4 text-xl font-semibold uppercase tracking-wide">
-                      Panel de perfil
-                    </h2>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <ProfileField label="Nombre completo" value={user.name} />
-                      <ProfileField label="Correo electronico" value={user.email} />
-                      <ProfileField
-                        label="ID de usuario"
-                        value={String(user.id ?? "Sin asignar")}
-                      />
-                      <ProfileField
-                        label="Fecha de registro"
-                        value={formatDate(userMeta.joinedAt)}
-                      />
-                      <ProfileField
-                        label="Ultimo acceso"
-                        value={formatDate(new Date())}
-                      />
-                      <ProfileField
-                        label="Seguridad"
-                        value="Cuenta protegida"
-                        icon={<ShieldCheck className="h-4 w-4 text-emerald-300" />}
-                      />
-                    </div>
-                  </article>
-
-                  <article className="rounded-sm border border-white/10 bg-[#0d1117] p-6 shadow-xl shadow-black/40">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <h2 className="text-xl font-semibold uppercase tracking-wide">
-                        Mis subastas
-                      </h2>
-                      <span className="border border-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-brand-orange">
-                        {mySubastas.length} publicadas
-                      </span>
-                    </div>
-
-                    {mySubastas.length === 0 ? (
-                      <p className="text-sm text-white/70">
-                        Aun no tienes subastas publicadas. Puedes crear una desde
-                        la opcion "Subir Articulo".
-                      </p>
-                    ) : (
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {mySubastas.slice(0, 6).map((item) => (
-                          <article
-                            key={pickId(item)}
-                            className="border border-white/10 bg-black/30 p-4"
-                          >
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brand-orange">
-                              Activa
-                            </p>
-                            <p className="mt-2 text-base font-semibold">
-                              {pickText(item, ["titulo", "title", "nombre"]) || "Subasta"}
-                            </p>
-                            <p className="mt-2 text-sm text-white/65">
-                              Estado:{" "}
-                              {pickText(item, ["estado", "status", "estado_subasta"]) ||
-                                "Sin estado"}
-                            </p>
-                            <p className="mt-3 text-xl font-bold text-brand-orange">
-                              {formatCurrency(
-                                pickNumber(item, [
-                                  "precio_actual",
-                                  "precio_inicial",
-                                  "precio",
-                                ]),
-                              )}
-                            </p>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </article>
-                </div>
+                <article className="rounded-2xl bg-[#141822] p-6 shadow-xl shadow-black/30 lg:col-span-2">
+                  <h2 className="mb-4 text-xl font-semibold">Datos personales</h2>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <ProfileField label="Nombre completo" value={user.name} />
+                    <ProfileField label="Correo electronico" value={user.email} />
+                    <ProfileField
+                      label="ID de usuario"
+                      value={String(user.id ?? "Sin asignar")}
+                    />
+                    <ProfileField
+                      label="Fecha de registro"
+                      value={formatDate(userMeta.joinedAt)}
+                    />
+                    <ProfileField
+                      label="Ultimo acceso"
+                      value={formatDate(new Date())}
+                    />
+                    <ProfileField
+                      label="Seguridad"
+                      value="Cuenta protegida"
+                      icon={<ShieldCheck className="h-4 w-4 text-emerald-300" />}
+                    />
+                  </div>
+                </article>
               </div>
+
+              <article className="rounded-2xl bg-[#141822] p-6 shadow-xl shadow-black/30">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold">Mis Subastas</h2>
+                  <span className="rounded-full bg-brand-orange/20 px-3 py-1 text-xs font-semibold text-brand-orange">
+                    {mySubastas.length} publicadas
+                  </span>
+                </div>
+
+                {mySubastas.length === 0 ? (
+                  <p className="text-sm text-white/70">
+                    Aun no tienes subastas publicadas. Puedes crear una desde
+                    la opcion "Subir Articulo".
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {mySubastas.slice(0, 8).map((item) => (
+                      <article
+                        key={pickId(item)}
+                        className="rounded-xl border border-white/10 bg-black/20 p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-semibold">
+                            {pickText(item, ["titulo", "title", "nombre"]) ||
+                              "Subasta"}
+                          </p>
+                          <p className="text-brand-orange">
+                            {formatCurrency(
+                              pickNumber(item, [
+                                "precio_actual",
+                                "precio_inicial",
+                                "precio",
+                              ]),
+                            )}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-sm text-white/70">
+                          Estado:{" "}
+                          {pickText(item, ["estado", "status", "estado_subasta"]) ||
+                            "Sin estado"}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </article>
             </section>
           )}
 
@@ -1228,7 +1160,6 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
             </section>
           )}
         </main>
-      </div>
       </div>
     </div>
   );
@@ -1473,6 +1404,24 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TrendingValue({
+  value,
+  label,
+  accent,
+}: {
+  value: string;
+  label: string;
+  accent: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <ChartColumnBig className={`h-5 w-5 ${accent}`} />
+      <p className="text-3xl font-semibold">{value}</p>
+      <p className="text-white/75">{label}</p>
+    </div>
+  );
+}
+
 function ProfileField({
   label,
   value,
@@ -1483,29 +1432,12 @@ function ProfileField({
   icon?: ReactNode;
 }) {
   return (
-    <div className="border border-white/10 bg-black/20 p-4">
-      <p className="mb-1 text-[11px] uppercase tracking-[0.14em] text-white/55">{label}</p>
+    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+      <p className="mb-1 text-sm text-white/65">{label}</p>
       <p className="inline-flex items-center gap-2 text-base font-medium">
         {icon}
         {value}
       </p>
     </div>
-  );
-}
-
-function MetricCardTerminal({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent: string;
-}) {
-  return (
-    <article className="border border-white/10 bg-[#0d1117] p-4 shadow-lg shadow-black/40">
-      <p className="text-[10px] uppercase tracking-[0.14em] text-white/55">{label}</p>
-      <p className={`mt-2 text-2xl font-bold ${accent}`}>{value}</p>
-    </article>
   );
 }

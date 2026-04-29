@@ -1,17 +1,7 @@
-/**
- * Base del API del back (sin path extra después de `/api`).
- * Ejemplo: `https://back-bidnow.onrender.com/api`
- *
- * En `.env` o variables de Render, define una de:
- * - `VITE_API_BASE_URL` (recomendado en Vite)
- * - `FRONTEND_API_BASE_URL`
- * - `REACT_APP_API_URL` (nombre típico de CRA; aquí expuesto vía `envPrefix` en vite.config)
- */
 const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
   (import.meta.env.FRONTEND_API_BASE_URL as string | undefined)?.trim() ||
-  (import.meta.env.REACT_APP_API_URL as string | undefined)?.trim() ||
-  "https://back-bidnow.onrender.com/api";
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
+  "http://127.0.0.1:8000";
 
 export class ApiError extends Error {
   status: number;
@@ -27,34 +17,13 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Une base del API + path. Si la base ya incluye `/api` y el path empieza por `/api/…`,
- * no duplicar segmentos (evita `…/api/api/personas/` cuando `VITE_API_BASE_URL` termina en `/api`).
- */
 function joinUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
-  const baseStr = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  let normalizedPath = path.startsWith("/") ? path : `/${path}`;
-
-  try {
-    const baseUrl = new URL(baseStr.includes("://") ? baseStr : `https://${baseStr}`);
-    const prefix = baseUrl.pathname.replace(/\/$/, "") || "";
-    if (prefix && normalizedPath.startsWith(`${prefix}/`)) {
-      normalizedPath = normalizedPath.slice(prefix.length);
-      if (!normalizedPath.startsWith("/")) {
-        normalizedPath = `/${normalizedPath}`;
-      }
-    }
-    const originAndBasePath = `${baseUrl.origin}${prefix}`;
-    return `${originAndBasePath}${normalizedPath}`;
-  } catch {
-    if (/\/api$/i.test(baseStr) && normalizedPath.startsWith("/api/")) {
-      normalizedPath = normalizedPath.slice(4);
-    }
-    return `${baseStr}${normalizedPath}`;
-  }
+  const base = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
@@ -67,21 +36,6 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   } catch {
     return text;
   }
-}
-
-function fieldErrorsToMessage(data: Record<string, unknown>): string | null {
-  const parts: string[] = [];
-  for (const [key, value] of Object.entries(data)) {
-    if (key === "detail" || key === "message" || key === "error") {
-      continue;
-    }
-    if (Array.isArray(value) && value.length > 0) {
-      parts.push(`${key}: ${String(value[0])}`);
-    } else if (typeof value === "string" && value.trim()) {
-      parts.push(`${key}: ${value}`);
-    }
-  }
-  return parts.length > 0 ? parts.join(" ") : null;
 }
 
 function getErrorMessage(status: number, payload: unknown): string {
@@ -99,10 +53,6 @@ function getErrorMessage(status: number, payload: unknown): string {
       if (Array.isArray(value) && value.length > 0) {
         return String(value[0]);
       }
-    }
-    const fromFields = fieldErrorsToMessage(data);
-    if (fromFields) {
-      return fromFields;
     }
     return JSON.stringify(payload);
   }
