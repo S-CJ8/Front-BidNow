@@ -27,13 +27,34 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Une base del API + path. Si la base ya incluye `/api` y el path empieza por `/api/…`,
+ * no duplicar segmentos (evita `…/api/api/personas/` cuando `VITE_API_BASE_URL` termina en `/api`).
+ */
 function joinUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
-  const base = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${normalizedPath}`;
+  const baseStr = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  let normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  try {
+    const baseUrl = new URL(baseStr.includes("://") ? baseStr : `https://${baseStr}`);
+    const prefix = baseUrl.pathname.replace(/\/$/, "") || "";
+    if (prefix && normalizedPath.startsWith(`${prefix}/`)) {
+      normalizedPath = normalizedPath.slice(prefix.length);
+      if (!normalizedPath.startsWith("/")) {
+        normalizedPath = `/${normalizedPath}`;
+      }
+    }
+    const originAndBasePath = `${baseUrl.origin}${prefix}`;
+    return `${originAndBasePath}${normalizedPath}`;
+  } catch {
+    if (/\/api$/i.test(baseStr) && normalizedPath.startsWith("/api/")) {
+      normalizedPath = normalizedPath.slice(4);
+    }
+    return `${baseStr}${normalizedPath}`;
+  }
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
