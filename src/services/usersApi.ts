@@ -49,16 +49,21 @@ function extractList(response: unknown): ApiRecord[] {
   return [];
 }
 
-function personaMatchesEmail(p: ApiRecord, normalizedEmail: string): boolean {
+function personaMatchesIdentity(p: ApiRecord, normalizedEmail: string): boolean {
   const mail = toText(p.email).toLowerCase();
   const corr = toText(p.correo).toLowerCase();
-  return mail === normalizedEmail || corr === normalizedEmail;
+  const idn = toText(p.identidad).toLowerCase();
+  return (
+    mail === normalizedEmail ||
+    corr === normalizedEmail ||
+    idn === normalizedEmail
+  );
 }
 
-/** Une resultados de ?email= y ?correo= (misma persona puede aparecer en uno u otro filtro). */
+/** Une resultados de ?email=, ?correo= e ?identidad= (misma persona puede aparecer en varios filtros). */
 async function fetchPersonasByEmail(normalizedEmail: string): Promise<ApiRecord[]> {
   const byPk = new Map<string, ApiRecord>();
-  for (const filter of ["email", "correo"] as const) {
+  for (const filter of ["email", "correo", "identidad"] as const) {
     try {
       const res = await httpClient.get<unknown>(personasListUrl(filter, normalizedEmail));
       for (const p of extractList(res)) {
@@ -86,8 +91,8 @@ function getPersonaPk(persona: ApiRecord): string | number | null {
 }
 
 /**
- * Busca filas de usuario enlazadas a esta persona: primero `id_persona`, luego `email` / `correo`
- * y se filtra siempre por FK hacia la persona.
+ * Busca usuario enlazado: `id_persona`, luego listados por `email`, `correo` o `identidad`
+ * y se filtra por FK hacia la persona cuando hace falta.
  */
 async function fetchUsuarioForPersona(
   personaPk: string | number,
@@ -97,6 +102,7 @@ async function fetchUsuarioForPersona(
     usuariosListUrl("id_persona", personaPk),
     usuariosListUrl("email", normalizedEmail),
     usuariosListUrl("correo", normalizedEmail),
+    usuariosListUrl("identidad", normalizedEmail),
   ];
 
   for (const url of attempts) {
@@ -136,8 +142,10 @@ export function normalizedUserFromLoginResponse(data: unknown): NormalizedUser {
   const email =
     toText(persona.correo) ||
     toText(persona.email) ||
+    toText(persona.identidad) ||
     toText(usuario.email) ||
-    toText(usuario.correo);
+    toText(usuario.correo) ||
+    toText(usuario.identidad);
 
   if (!email) {
     throw new Error(MSG_CORREO_NO_REGISTRADO);
@@ -181,7 +189,7 @@ export async function loginUser(
     throw new Error(MSG_CORREO_NO_REGISTRADO);
   }
 
-  const personaMatch = personas.find((p) => personaMatchesEmail(p, normalizedEmail));
+  const personaMatch = personas.find((p) => personaMatchesIdentity(p, normalizedEmail));
   const persona =
     personaMatch ?? (personas.length === 1 ? personas[0] : null);
   if (!persona) {

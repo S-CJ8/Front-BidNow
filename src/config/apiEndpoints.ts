@@ -30,16 +30,16 @@ export const apiEndpoints = {
   docs: "/api/docs/",
 } as const;
 
-/** Filtros soportados en GET list de personas */
-export type PersonaListFilter = "email" | "correo";
+/** Filtros soportados en GET list de personas (mismo criterio trim + minúsculas en BD). */
+export type PersonaListFilter = "email" | "correo" | "identidad";
 
 export function personasListUrl(filter: PersonaListFilter, value: string): string {
   const v = encodeURIComponent(value);
   return `${apiEndpoints.personas}?${filter}=${v}`;
 }
 
-/** Filtros soportados en GET list de usuarios */
-export type UsuarioListFilter = "id_persona" | "email" | "correo";
+/** Filtros soportados en GET list de usuarios (email, correo e identidad equivalentes en el back). */
+export type UsuarioListFilter = "id_persona" | "email" | "correo" | "identidad";
 
 export function usuariosListUrl(filter: UsuarioListFilter, value: string | number): string {
   const v = encodeURIComponent(String(value).trim());

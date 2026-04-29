@@ -363,8 +363,11 @@ export function LoginPage({ onSuccess, onBackHome }: LoginPageProps) {
         <div className="mt-6 border border-brand-orange/70 bg-[#1a0f0a] px-4 py-3 text-center text-xs font-medium text-brand-orange">
           Si el front apunta a otra URL de API que la de tu backend real, el login puede mostrar
           «No existe un usuario registrado con ese correo.» aunque el correo exista en la base
-          correcta. Define `FRONTEND_API_BASE_URL` (o `VITE_API_BASE_URL`) con la base exacta de
-          tu API, por ejemplo `https://back-bidnow.onrender.com/api`.
+          correcta. Define `FRONTEND_API_BASE_URL` (o `VITE_API_BASE_URL`) con la base exacta, por
+          ejemplo `https://back-bidnow.onrender.com/api`. Si el navegador bloquea por CORS, en
+          el servicio del back configura `FRONTEND_ORIGINS` (coma, sin barra final) o
+          `EXTRA_CORS_ORIGINS` con el origen de este front (Render añade por defecto front-bidnow
+          y orígenes Vite locales si no configuras nada).
         </div>
       </div>
     </div>
