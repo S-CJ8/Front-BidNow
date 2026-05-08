@@ -1,7 +1,22 @@
-const API_BASE_URL =
+function normalizeApiBaseUrl(raw: string): string {
+  let base = raw.trim();
+  while (base.endsWith("/")) {
+    base = base.slice(0, -1);
+  }
+  // Si la base incluye un recurso (p. ej. .../api/usuarios), el código añade otra vez
+  // `/api/usuarios/` y Django responde 404. La base debe ser solo la raíz del API (.../api).
+  const withExtraSegment = base.match(/^(.*\/api)\/[^/]+$/i);
+  if (withExtraSegment) {
+    return withExtraSegment[1]!;
+  }
+  return base;
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(
   (import.meta.env.FRONTEND_API_BASE_URL as string | undefined)?.trim() ||
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
-  "https://back-bidnow.onrender.com/api";
+    (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
+    "https://back-bidnow.onrender.com/api",
+);
 
 export class ApiError extends Error {
   status: number;
@@ -51,9 +66,10 @@ function getErrorMessage(status: number, payload: unknown): string {
     if (isLikelyHtmlErrorPage(payload)) {
       if (status === 404) {
         return (
-          "No se encontró la ruta del API (404). Suele pasar si FRONTEND_API_BASE_URL o " +
-          "VITE_API_BASE_URL apunta al front (por ejemplo localhost del Vite) en lugar del backend Django, " +
-          "o si la URL base es incorrecta. El valor por defecto es https://back-bidnow.onrender.com/api"
+          "La URL base del API no coincide con el backend (respuesta HTML 404). " +
+          "Usa solo la raíz del API, sin `/usuarios`: por ejemplo https://back-bidnow.onrender.com/api " +
+          "(el front ya pide `/api/usuarios/`). Comprueba FRONTEND_API_BASE_URL y VITE_API_BASE_URL " +
+          "y que no apunten al servidor del front (p. ej. localhost de Vite)."
         );
       }
       return `El servidor devolvió HTML en lugar de JSON (${status}). Revisa la URL base del API.`;

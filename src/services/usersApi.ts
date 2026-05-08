@@ -1,4 +1,5 @@
 import { httpClient } from "../lib/httpClient";
+import { usuariosService } from "./apiServices";
 
 export type NormalizedUser = {
   id?: number | string;
@@ -78,20 +79,9 @@ function extractList(raw: unknown): Array<Record<string, unknown>> {
 
 export async function registerUser(input: RegisterInput): Promise<void> {
   const normalizedEmail = input.email.trim().toLowerCase();
-  const persona = await httpClient.post<Record<string, unknown>>("/api/personas/", {
+  await usuariosService.create({
     nombre: input.name.trim(),
     correo: normalizedEmail,
-    email: normalizedEmail,
-  });
-
-  const idPersona =
-    persona.id_persona ?? persona.id ?? persona.pk ?? persona.idPersona;
-  if (idPersona === undefined || idPersona === null || String(idPersona).trim() === "") {
-    throw new Error("No se pudo crear la persona para registrar el usuario.");
-  }
-
-  await httpClient.post("/api/usuarios/", {
-    id_persona: idPersona,
     contrasena: input.password,
   });
 }
@@ -101,55 +91,27 @@ export async function loginUser(
   password: string,
 ): Promise<NormalizedUser> {
   const normalizedInput = emailOrUsername.trim().toLowerCase();
-  const personasRaw = await httpClient.get<unknown>(
-    `/api/personas/?search=${encodeURIComponent(normalizedInput)}`,
-  );
-  const personas = extractList(personasRaw);
-  if (personas.length === 0) {
-    throw new Error("No existe un usuario registrado con ese correo.");
-  }
-
-  const persona = personas[0];
-  const idPersona =
-    persona.id_persona ?? persona.id ?? persona.pk ?? persona.idPersona;
-  if (idPersona === undefined || idPersona === null || String(idPersona).trim() === "") {
-    throw new Error("No existe un usuario registrado con ese correo.");
-  }
-
   const usuariosRaw = await httpClient.get<unknown>(
-    `/api/usuarios/?search=${encodeURIComponent(String(idPersona))}`,
+    `/api/usuarios/?search=${encodeURIComponent(normalizedInput)}`,
   );
   const usuarios = extractList(usuariosRaw);
-  if (usuarios.length === 0) {
+
+  const firstUserRaw = usuarios[0];
+  if (!firstUserRaw) {
     throw new Error("No existe un usuario registrado con ese correo.");
   }
 
-  const usuario =
-    usuarios.find(
-      (u) =>
-        String(u.id_persona ?? u.persona ?? "").trim() === String(idPersona).trim(),
-    ) ?? usuarios[0];
-
-  const storedPassword =
-    toText(usuario.contrasena) ||
-    toText(usuario.password) ||
-    toText(usuario["contraseña"]);
-
+  const storedPassword = toText(
+    (firstUserRaw as Record<string, unknown>).contrasena,
+  );
   if (storedPassword !== password) {
     throw new Error("La contraseña no es correcta.");
   }
 
-  return (
-    normalizeUser({
-      ...usuario,
-      ...persona,
-      email: toText(persona.correo) || toText(persona.email) || normalizedInput,
-      correo: toText(persona.correo) || toText(persona.email) || normalizedInput,
-    }) || {
-      id: typeof idPersona === "number" || typeof idPersona === "string" ? idPersona : undefined,
-      name: toText(persona.nombre) || "Usuario",
-      email: toText(persona.correo) || toText(persona.email) || normalizedInput,
-      raw: { usuario, persona },
-    }
-  );
+  const normalized = normalizeUser(firstUserRaw);
+  if (!normalized) {
+    throw new Error("No existe un usuario registrado con ese correo.");
+  }
+  normalized.email = normalizedInput;
+  return normalized;
 }

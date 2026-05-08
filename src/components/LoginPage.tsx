@@ -357,8 +357,9 @@ export function LoginPage({ onSuccess, onBackHome }: LoginPageProps) {
         </div>
 
         <div className="mt-6 rounded-xl border-2 border-brand-orange bg-[#1a0f0a] px-4 py-3 text-center text-sm font-medium text-brand-orange">
-          💡 Si tu backend está en otra URL, define
-          `FRONTEND_API_BASE_URL` en tu entorno.
+          💡 Si tu backend está en otra URL, define `FRONTEND_API_BASE_URL` o
+          `VITE_API_BASE_URL` como la raíz del API (p. ej. https://back-bidnow.onrender.com/api),
+          sin añadir `/usuarios` al final.
         </div>
       </div>
     </div>

@@ -30,7 +30,7 @@ export default function App() {
         user={currentUser}
         onLogout={() => {
           setCurrentUser(null);
-          setView("home");
+          setView("login");
         }}
       />
     );
@@ -44,7 +44,7 @@ export default function App() {
         onLoginClick={() => setView("login")}
         onLogout={() => {
           setCurrentUser(null);
-          setView("home");
+          setView("login");
         }}
       />
       <main>
