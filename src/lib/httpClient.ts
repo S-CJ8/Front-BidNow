@@ -22,7 +22,10 @@ function joinUrl(path: string): string {
     return path;
   }
   const base = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  let normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (base.endsWith("/api") && normalizedPath.startsWith("/api/")) {
+    normalizedPath = normalizedPath.slice(4);
+  }
   return `${base}${normalizedPath}`;
 }
 
@@ -38,8 +41,23 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   }
 }
 
+function isLikelyHtmlErrorPage(text: string): boolean {
+  const head = text.slice(0, 200).toLowerCase();
+  return head.includes("<!doctype html") || head.includes("<html");
+}
+
 function getErrorMessage(status: number, payload: unknown): string {
   if (typeof payload === "string" && payload.trim()) {
+    if (isLikelyHtmlErrorPage(payload)) {
+      if (status === 404) {
+        return (
+          "No se encontró la ruta del API (404). Suele pasar si FRONTEND_API_BASE_URL o " +
+          "VITE_API_BASE_URL apunta al front (por ejemplo localhost del Vite) en lugar del backend Django, " +
+          "o si la URL base es incorrecta. El valor por defecto es https://back-bidnow.onrender.com/api"
+        );
+      }
+      return `El servidor devolvió HTML en lugar de JSON (${status}). Revisa la URL base del API.`;
+    }
     return payload;
   }
   if (payload && typeof payload === "object") {
