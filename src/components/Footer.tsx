@@ -35,19 +35,35 @@ export function Footer() {
           <div>
             <h3 className="text-sm font-semibold text-white">Enlaces Rápidos</h3>
             <ul className="mt-4 space-y-3 text-sm text-brand-muted">
-              {[
-                "Sobre Nosotros",
-                "Cómo Funciona",
-                "Categorías",
-                "Blog",
-                "Contacto",
-              ].map((link) => (
-                <li key={link}>
-                  <a href="#" className="transition hover:text-white">
-                    {link}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <a
+                  href="https://back-bidnow.onrender.com/api/docs/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transition hover:text-white"
+                >
+                  API (Swagger)
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://back-bidnow.onrender.com/api/schema/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transition hover:text-white"
+                >
+                  OpenAPI schema
+                </a>
+              </li>
+              {["Sobre Nosotros", "Cómo Funciona", "Categorías", "Blog", "Contacto"].map(
+                (link) => (
+                  <li key={link}>
+                    <a href="#" className="transition hover:text-white">
+                      {link}
+                    </a>
+                  </li>
+                ),
+              )}
             </ul>
           </div>
           <div>

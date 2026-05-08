@@ -5,7 +5,7 @@ import {
   Gavel,
   LayoutDashboard,
   LogOut,
-  Map,
+  Map as MapIcon,
   Package,
   Search,
   ShieldCheck,
@@ -17,11 +17,29 @@ import {
 import { ComponentType, ReactNode, useEffect, useMemo, useState } from "react";
 import { useApiRequest } from "../hooks/useApiRequest";
 import {
+  currentOfferAmount,
+  findProductForSubasta,
+  formatCountdownLabel,
+  formatCurrency,
+  isAuctionLive,
+  isSameId,
+  parseDateCandidate,
+  pickId,
+  pickIdOrNull,
+  pickNumber,
+  pickText,
+  subastaDescription,
+  subastaTitle,
+  toDecimalString,
+} from "../lib/liveAuctions";
+import {
   ApiRecord,
+  metodosPagoService,
   productosService,
   pujasService,
   subastasService,
   transaccionesService,
+  usuariosService,
 } from "../services/apiServices";
 import { NormalizedUser } from "../services/usersApi";
 
@@ -50,7 +68,7 @@ const menuItems: Array<{
   { id: "subastas", label: "Navegar Subastas", icon: Gavel },
   { id: "perfil", label: "Mi Perfil", icon: User },
   { id: "pedidos", label: "Mis Pedidos", icon: Package },
-  { id: "mapa", label: "Mapa de Calor", icon: Map },
+  { id: "mapa", label: "Mapa de Calor", icon: MapIcon },
 ];
 
 const fallbackAuctionImages = [
@@ -94,6 +112,11 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const [productos, setProductos] = useState<ApiRecord[]>([]);
   const [pujas, setPujas] = useState<ApiRecord[]>([]);
   const [transacciones, setTransacciones] = useState<ApiRecord[]>([]);
+  const [usuarios, setUsuarios] = useState<ApiRecord[]>([]);
+  const [metodosPago, setMetodosPago] = useState<ApiRecord[]>([]);
+  const [metodoTipo, setMetodoTipo] = useState("");
+  const [metodoReferencia, setMetodoReferencia] = useState("");
+  const [metodoTitular, setMetodoTitular] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [newProductTitle, setNewProductTitle] = useState("");
   const [newProductDescription, setNewProductDescription] = useState("");
@@ -131,20 +154,42 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
     };
   }, [user.raw]);
 
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const u of usuarios) {
+      const id = u.id_usuario ?? u.id;
+      if (typeof id === "number" || typeof id === "string") {
+        const name = pickText(u, ["nombre", "name", "username"]) || `Usuario ${id}`;
+        map.set(String(id), name);
+      }
+    }
+    return map;
+  }, [usuarios]);
+
   async function loadData() {
     setLoadState({ loading: true, error: "" });
     try {
-      const [subastasData, productosData, pujasData, transaccionesData] =
-        await Promise.all([
-          subastasService.list(),
-          productosService.list(),
-          pujasService.list(),
-          transaccionesService.list(),
-        ]);
+      const [
+        subastasData,
+        productosData,
+        pujasData,
+        transaccionesData,
+        usuariosData,
+        metodosData,
+      ] = await Promise.all([
+        subastasService.list(),
+        productosService.list(),
+        pujasService.list(),
+        transaccionesService.list(),
+        usuariosService.list(),
+        metodosPagoService.list(),
+      ]);
       setSubastas(subastasData);
       setProductos(productosData);
       setPujas(pujasData);
       setTransacciones(transaccionesData);
+      setUsuarios(usuariosData);
+      setMetodosPago(metodosData);
       setLoadState({ loading: false, error: "" });
     } catch (error) {
       setLoadState({
@@ -164,11 +209,20 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const totalInvested = useMemo(() => {
     const sum = transacciones.reduce(
       (acc, item) =>
-        acc + pickNumber(item, ["monto", "valor", "total", "amount"]),
+        acc +
+        pickNumber(item, ["monto_final", "monto", "valor", "total", "amount"]),
       0,
     );
     return formatCurrency(sum);
   }, [transacciones]);
+
+  const myMetodosPago = useMemo(() => {
+    if (currentUserId === null) {
+      return [];
+    }
+    const cid = String(currentUserId);
+    return metodosPago.filter((m) => isSameId(m.usuario, cid) || isSameId(m.usuario, currentUserId));
+  }, [metodosPago, currentUserId]);
 
   const liveSubastas = useMemo(
     () => subastas.filter((item) => isAuctionLive(item)),
@@ -214,17 +268,8 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
     if (!selectedAuction) {
       return 0;
     }
-    const fromAuction = pickNumber(selectedAuction, [
-      "precio_actual",
-      "oferta_actual",
-      "precio",
-      "valor_actual",
-    ]);
-    if (fromAuction > 0) {
-      return fromAuction;
-    }
-    return pickNumber(selectedAuctionBids[0] || {}, ["monto", "valor", "amount"]);
-  }, [selectedAuction, selectedAuctionBids]);
+    return currentOfferAmount(selectedAuction, productos, pujas);
+  }, [selectedAuction, productos, pujas]);
 
   const selectedMinBid = useMemo(
     () => Math.max(100, selectedCurrentPrice + 100),
@@ -233,26 +278,20 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
   const featuredAuctions = useMemo(
     () =>
-      liveSubastas.slice(0, 3).map((item, index) => ({
-        id: pickId(item),
-        title: pickText(item, ["titulo", "title", "nombre"]) || "Subasta en vivo",
-        category: pickText(item, ["categoria", "category"]) || "general",
-        price: formatCurrency(
-          pickNumber(item, [
-            "precio_actual",
-            "precio",
-            "oferta_actual",
-            "valor_actual",
-          ]),
-        ),
-        timeLeft:
-          pickText(item, ["tiempo_restante", "duracion", "time_left"]) ||
-          "En curso",
-        image:
-          pickText(item, ["imagen", "image", "foto"]) ||
-          fallbackAuctionImages[index % fallbackAuctionImages.length],
-      })),
-    [liveSubastas],
+      liveSubastas.slice(0, 3).map((item, index) => {
+        const product = findProductForSubasta(item, productos);
+        return {
+          id: pickId(item),
+          title: subastaTitle(item, productos),
+          category: pickText(product ?? item, ["categoria", "category"]) || "General",
+          price: formatCurrency(currentOfferAmount(item, productos, pujas)),
+          timeLeft: formatCountdownLabel(item),
+          image:
+            pickText(product ?? item, ["imagen", "image", "foto"]) ||
+            fallbackAuctionImages[index % fallbackAuctionImages.length],
+        };
+      }),
+    [liveSubastas, productos, pujas],
   );
 
   const mySubastas = useMemo(
@@ -288,41 +327,22 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
           );
         }
 
-        const payload: ApiRecord = {
-          nombre: newProductTitle.trim(),
-          descripcion: newProductDescription.trim(),
-        };
+        const vendorId = Number(currentUserId);
+        if (!Number.isFinite(vendorId)) {
+          throw new Error("Identificador de usuario invalido.");
+        }
+
         const parsedPrice = Number.parseFloat(newProductPrice);
         if (Number.isNaN(parsedPrice) || parsedPrice <= 0) {
           throw new Error("Debes ingresar un precio inicial valido para la subasta.");
         }
-        payload.precio_inicial = parsedPrice;
 
-        const productPayloadCandidates: ApiRecord[] = [
-          { ...payload, vendedor: currentUserId },
-          { ...payload, vendedor_id: currentUserId },
-          { ...payload, usuario: currentUserId },
-          { ...payload, usuario_id: currentUserId },
-          { ...payload, propietario: currentUserId },
-        ];
-
-        let createdProduct: ApiRecord | null = null;
-        let lastError: Error | null = null;
-        for (const candidate of productPayloadCandidates) {
-          try {
-            const response = await productosService.create(candidate);
-            createdProduct = response;
-            lastError = null;
-            break;
-          } catch (error) {
-            lastError =
-              error instanceof Error ? error : new Error("Error al crear producto.");
-          }
-        }
-
-        if (lastError) {
-          throw lastError;
-        }
+        const createdProduct = await productosService.create({
+          titulo: newProductTitle.trim(),
+          descripcion: newProductDescription.trim(),
+          precio_inicial: toDecimalString(parsedPrice),
+          vendedor: vendorId,
+        });
 
         const productId = await resolveCreatedProductId(
           createdProduct,
@@ -342,50 +362,13 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
         );
         const endDate = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
 
-        const auctionBasePayload: ApiRecord = {
-          precio_inicial: parsedPrice,
+        await subastasService.create({
+          producto: Number(productId),
+          subastador: vendorId,
           fecha_inicio: now.toISOString(),
           fecha_fin: endDate.toISOString(),
           estado: "activa",
-        };
-
-        const auctionPayloadCandidates: ApiRecord[] = [
-          {
-            ...auctionBasePayload,
-            producto: productId,
-            vendedor: currentUserId,
-          },
-          {
-            ...auctionBasePayload,
-            producto_id: productId,
-            vendedor_id: currentUserId,
-          },
-          {
-            ...auctionBasePayload,
-            id_producto: productId,
-            id_usuario: currentUserId,
-          },
-          {
-            ...auctionBasePayload,
-            producto: productId,
-            usuario: currentUserId,
-          },
-        ];
-
-        lastError = null;
-        for (const candidate of auctionPayloadCandidates) {
-          try {
-            await subastasService.create(candidate);
-            lastError = null;
-            break;
-          } catch (error) {
-            lastError =
-              error instanceof Error ? error : new Error("Error al crear subasta.");
-          }
-        }
-        if (lastError) {
-          throw lastError;
-        }
+        });
 
         setNewProductTitle("");
         setNewProductDescription("");
@@ -416,7 +399,7 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
     const byTitle = ownerMatches
       .filter(
         (item) =>
-          pickText(item, ["nombre", "title", "titulo"]).trim().toLowerCase() ===
+          pickText(item, ["titulo", "nombre", "title"]).trim().toLowerCase() ===
           productTitle.trim().toLowerCase(),
       )
       .sort((a, b) => {
@@ -465,31 +448,47 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
         }
 
         const auctionId = pickId(selectedAuction);
-        const payloadCandidates: ApiRecord[] = [
-          { subasta: auctionId, usuario: currentUserId, monto: amount },
-          { subasta_id: auctionId, usuario_id: currentUserId, monto: amount },
-          { id_subasta: auctionId, id_usuario: currentUserId, valor: amount },
-          { auction: auctionId, user: currentUserId, amount },
-        ];
-
-        let lastError: Error | null = null;
-        for (const payload of payloadCandidates) {
-          try {
-            await pujasService.create(payload);
-            lastError = null;
-            break;
-          } catch (error) {
-            lastError =
-              error instanceof Error ? error : new Error("No se pudo registrar la puja.");
-          }
+        const bidderId = Number(currentUserId);
+        if (!Number.isFinite(bidderId)) {
+          throw new Error("Identificador de usuario invalido.");
         }
-        if (lastError) {
-          throw lastError;
-        }
+        await pujasService.create({
+          subasta: Number(auctionId),
+          usuario: bidderId,
+          monto: toDecimalString(amount),
+        });
         setBidAmountInput("");
         await loadData();
       },
       "Puja registrada correctamente.",
+    );
+  }
+
+  async function handleAddMetodoPago() {
+    await run(
+      async () => {
+        if (currentUserId === null) {
+          throw new Error("Debes iniciar sesion para guardar un metodo de pago.");
+        }
+        const uid = Number(currentUserId);
+        if (!Number.isFinite(uid)) {
+          throw new Error("Identificador de usuario invalido.");
+        }
+        if (!metodoTipo.trim()) {
+          throw new Error("Indica el tipo de metodo (por ejemplo tarjeta o transferencia).");
+        }
+        await metodosPagoService.create({
+          usuario: uid,
+          tipo: metodoTipo.trim(),
+          numero_referencia: metodoReferencia.trim() || undefined,
+          titular: metodoTitular.trim() || undefined,
+        });
+        setMetodoTipo("");
+        setMetodoReferencia("");
+        setMetodoTitular("");
+        await loadData();
+      },
+      "Metodo de pago guardado.",
     );
   }
 
@@ -745,17 +744,10 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                       }`}
                     >
                       <p className="font-semibold">
-                        {pickText(item, ["titulo", "title", "nombre"]) || `Subasta ${idx + 1}`}
+                        {subastaTitle(item, productos) || `Subasta ${idx + 1}`}
                       </p>
                       <p className="mt-1 text-sm text-brand-orange">
-                        {formatCurrency(
-                          pickNumber(item, [
-                            "precio_actual",
-                            "oferta_actual",
-                            "precio",
-                            "valor_actual",
-                          ]),
-                        )}
+                        {formatCurrency(currentOfferAmount(item, productos, pujas))}
                       </p>
                     </button>
                   );
@@ -773,10 +765,13 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                       <div className="relative h-64 md:h-80">
                         <img
                           src={
-                            pickText(selectedAuction, ["imagen", "image", "foto"]) ||
-                            fallbackAuctionImages[0]
+                            pickText(
+                              findProductForSubasta(selectedAuction, productos) ??
+                                selectedAuction,
+                              ["imagen", "image", "foto"],
+                            ) || fallbackAuctionImages[0]
                           }
-                          alt={pickText(selectedAuction, ["titulo", "title", "nombre"]) || "Subasta"}
+                          alt={subastaTitle(selectedAuction, productos) || "Subasta"}
                           className="h-full w-full object-cover"
                         />
                         <span className="absolute left-4 top-4 rounded-full bg-brand-orange px-3 py-1 text-xs font-semibold">
@@ -787,11 +782,10 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
                     <article className="rounded-2xl bg-[#141822] p-6 shadow-xl shadow-black/30">
                       <h3 className="text-3xl font-semibold">
-                        {pickText(selectedAuction, ["titulo", "title", "nombre"]) || "Subasta en vivo"}
+                        {subastaTitle(selectedAuction, productos) || "Subasta en vivo"}
                       </h3>
                       <p className="mt-4 text-lg leading-relaxed text-white/85">
-                        {pickText(selectedAuction, ["descripcion", "description", "detalle"]) ||
-                          "Descripcion no disponible para esta subasta."}
+                        {subastaDescription(selectedAuction, productos)}
                       </p>
                       <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600">
@@ -799,11 +793,13 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                         </div>
                         <div>
                           <p className="font-semibold">
-                            {pickText(selectedAuction, [
-                              "vendedor_nombre",
-                              "usuario_nombre",
-                              "owner_name",
-                            ]) || "Vendedor de la subasta"}
+                            {userNameById.get(
+                              String(
+                                selectedAuction.subastador ??
+                                  selectedAuction.vendedor ??
+                                  "",
+                              ),
+                            ) || "Vendedor de la subasta"}
                           </p>
                           <p className="text-sm text-yellow-300">★ 4.9</p>
                         </div>
@@ -825,11 +821,9 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                           >
                             <div>
                               <p className="font-medium">
-                                {pickText(bid, [
-                                  "usuario_nombre",
-                                  "postor_nombre",
-                                  "user_name",
-                                ]) || "Postor"}
+                                {userNameById.get(
+                                  String(bid.usuario ?? bid.usuario_id ?? ""),
+                                ) || "Postor"}
                               </p>
                               <p className="text-xs text-white/60">
                                 {pickText(bid, ["hora", "fecha", "created_at"]) || "Reciente"}
@@ -938,17 +932,10 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="font-semibold">
-                          {pickText(item, ["titulo", "title", "nombre"]) ||
-                            "Subasta"}
+                          {subastaTitle(item, productos) || "Subasta"}
                         </p>
                         <p className="text-brand-orange">
-                          {formatCurrency(
-                            pickNumber(item, [
-                              "precio_actual",
-                              "precio_inicial",
-                              "precio",
-                            ]),
-                          )}
+                          {formatCurrency(currentOfferAmount(item, productos, pujas))}
                         </p>
                       </div>
                     </article>
@@ -1085,17 +1072,10 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="font-semibold">
-                            {pickText(item, ["titulo", "title", "nombre"]) ||
-                              "Subasta"}
+                            {subastaTitle(item, productos) || "Subasta"}
                           </p>
                           <p className="text-brand-orange">
-                            {formatCurrency(
-                              pickNumber(item, [
-                                "precio_actual",
-                                "precio_inicial",
-                                "precio",
-                              ]),
-                            )}
+                            {formatCurrency(currentOfferAmount(item, productos, pujas))}
                           </p>
                         </div>
                         <p className="mt-2 text-sm text-white/70">
@@ -1107,6 +1087,65 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                     ))}
                   </div>
                 )}
+              </article>
+
+              <article className="rounded-2xl bg-[#141822] p-6 shadow-xl shadow-black/30">
+                <h2 className="mb-4 text-xl font-semibold">Metodos de pago</h2>
+                <p className="mb-4 text-sm text-white/70">
+                  Datos desde <code className="text-brand-orange">/api/metodos-pago/</code> filtrados por tu usuario.
+                </p>
+                {myMetodosPago.length === 0 ? (
+                  <p className="text-sm text-white/70">Aun no registras metodos de pago.</p>
+                ) : (
+                  <ul className="mb-6 space-y-2 text-sm">
+                    {myMetodosPago.map((m) => (
+                      <li
+                        key={pickId(m)}
+                        className="rounded-lg border border-white/10 bg-black/20 px-3 py-2"
+                      >
+                        <span className="font-medium text-white">
+                          {pickText(m, ["tipo"]) || "Metodo"}
+                        </span>
+                        {pickText(m, ["titular"]) ? (
+                          <span className="text-white/60"> — {pickText(m, ["titular"])}</span>
+                        ) : null}
+                        {pickText(m, ["numero_referencia"]) ? (
+                          <span className="block text-xs text-white/50">
+                            Ref. {pickText(m, ["numero_referencia"])}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="grid gap-3 md:grid-cols-3">
+                  <input
+                    value={metodoTipo}
+                    onChange={(e) => setMetodoTipo(e.target.value)}
+                    placeholder="Tipo (ej. tarjeta, transferencia)"
+                    className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 focus:border-brand-orange focus:outline-none"
+                  />
+                  <input
+                    value={metodoReferencia}
+                    onChange={(e) => setMetodoReferencia(e.target.value)}
+                    placeholder="Numero o referencia"
+                    className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 focus:border-brand-orange focus:outline-none"
+                  />
+                  <input
+                    value={metodoTitular}
+                    onChange={(e) => setMetodoTitular(e.target.value)}
+                    placeholder="Titular"
+                    className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 focus:border-brand-orange focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddMetodoPago}
+                  disabled={mutating}
+                  className="mt-4 rounded-xl bg-brand-orange px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
+                >
+                  {mutating ? "Guardando..." : "Agregar metodo"}
+                </button>
               </article>
             </section>
           )}
@@ -1129,7 +1168,13 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
                       </p>
                       <p className="text-brand-orange">
                         {formatCurrency(
-                          pickNumber(item, ["monto", "total", "amount", "valor"]),
+                          pickNumber(item, [
+                            "monto_final",
+                            "monto",
+                            "total",
+                            "amount",
+                            "valor",
+                          ]),
                         )}
                       </p>
                     </div>
@@ -1165,78 +1210,6 @@ export function DashboardPage({ user, onLogout }: DashboardPageProps) {
   );
 }
 
-function pickText(item: ApiRecord, keys: string[]): string {
-  for (const key of keys) {
-    const value = item[key];
-    if (typeof value === "string" && value.trim()) {
-      return value;
-    }
-  }
-  return "";
-}
-
-function pickNumber(item: ApiRecord, keys: string[]): number {
-  for (const key of keys) {
-    const value = item[key];
-    if (typeof value === "number") {
-      return value;
-    }
-    if (typeof value === "string") {
-      const parsed = Number.parseFloat(value.replace(/[^\d.-]/g, ""));
-      if (!Number.isNaN(parsed)) {
-        return parsed;
-      }
-    }
-  }
-  return 0;
-}
-
-function pickId(item: ApiRecord): string | number {
-  const value = item.id ?? item.id_subasta ?? item.id_producto ?? item.id_puja;
-  if (typeof value === "number" || typeof value === "string") {
-    return value;
-  }
-  return Math.random().toString(36).slice(2);
-}
-
-function pickIdOrNull(item: ApiRecord): string | number | null {
-  const value = item.id ?? item.id_subasta ?? item.id_producto ?? item.id_puja;
-  if (typeof value === "number" || typeof value === "string") {
-    return value;
-  }
-  return null;
-}
-
-function isSameId(left: unknown, right: unknown): boolean {
-  if (left === null || left === undefined || right === null || right === undefined) {
-    return false;
-  }
-  return String(left).trim() === String(right).trim();
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatCountdownLabel(item: ApiRecord): string {
-  const endTimestamp = parseDateCandidate(
-    item.fecha_fin ?? item.finaliza_en ?? item.end_date ?? item.end_at,
-  );
-  if (!endTimestamp) {
-    return pickText(item, ["tiempo_restante", "duracion", "time_left"]) || "En curso";
-  }
-  const diffMs = Math.max(0, endTimestamp - Date.now());
-  const totalSeconds = Math.floor(diffMs / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${hours}h ${minutes}m ${seconds}s`;
-}
-
 function getCurrentUserId(user: NormalizedUser): number | string | null {
   const candidates = [
     user.id,
@@ -1263,6 +1236,7 @@ function isOwnedByCurrentUser(
 ): boolean {
   const ownerIdCandidates = [
     item.vendedor,
+    item.subastador,
     item.vendedor_id,
     item.usuario,
     item.usuario_id,
@@ -1351,48 +1325,6 @@ function isAuctionOwnedByCurrentUser(
   }
 
   return false;
-}
-
-function isAuctionLive(item: ApiRecord): boolean {
-  const booleanFlags = [
-    item.en_vivo,
-    item.is_live,
-    item.activa,
-    item.activo,
-    item.live,
-  ];
-  if (booleanFlags.some((value) => value === true)) {
-    return true;
-  }
-
-  const status = pickText(item, ["estado", "status", "estado_subasta"]).toLowerCase();
-  if (
-    ["en vivo", "activa", "activo", "live", "open", "abierta"].includes(status)
-  ) {
-    return true;
-  }
-
-  const now = Date.now();
-  const startCandidate = parseDateCandidate(
-    item.fecha_inicio ?? item.inicia_en ?? item.start_date ?? item.start_at,
-  );
-  const endCandidate = parseDateCandidate(
-    item.fecha_fin ?? item.finaliza_en ?? item.end_date ?? item.end_at,
-  );
-  if (startCandidate && endCandidate) {
-    return startCandidate <= now && now <= endCandidate;
-  }
-
-  return false;
-}
-
-function parseDateCandidate(value: unknown): number | null {
-  if (typeof value !== "string" && typeof value !== "number") {
-    return null;
-  }
-  const date = new Date(value);
-  const timestamp = date.getTime();
-  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {

@@ -1,6 +1,32 @@
 import { Play } from "lucide-react";
+import { useEffect, useState } from "react";
+import { subastasService, usuariosService } from "../services/apiServices";
 
 export function Hero() {
+  const [stats, setStats] = useState<{ subastas: number; usuarios: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [subastas, usuarios] = await Promise.all([
+          subastasService.list(),
+          usuariosService.list(),
+        ]);
+        if (!cancelled) {
+          setStats({ subastas: subastas.length, usuarios: usuarios.length });
+        }
+      } catch {
+        if (!cancelled) {
+          setStats(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <section
       id="inicio"
@@ -51,21 +77,30 @@ export function Hero() {
         <div className="grid grid-cols-1 gap-8 text-center sm:grid-cols-3 sm:gap-4">
           <div>
             <p className="font-sans text-3xl font-bold text-brand-orange md:text-4xl">
-              1,234
+              {stats === null ? "…" : stats.subastas}
             </p>
-            <p className="mt-1 text-sm text-brand-muted">Subastas Activas</p>
+            <p className="mt-1 text-sm text-brand-muted">Subastas en API</p>
           </div>
           <div>
             <p className="font-sans text-3xl font-bold text-brand-orange md:text-4xl">
-              45K+
+              {stats === null ? "…" : stats.usuarios}
             </p>
-            <p className="mt-1 text-sm text-brand-muted">Usuarios Activos</p>
+            <p className="mt-1 text-sm text-brand-muted">Usuarios registrados</p>
           </div>
           <div>
             <p className="font-sans text-3xl font-bold text-brand-orange md:text-4xl">
-              $2.5M
+              API
             </p>
-            <p className="mt-1 text-sm text-brand-muted">Vendido este mes</p>
+            <p className="mt-1 text-sm text-brand-muted">
+              <a
+                href="https://back-bidnow.onrender.com/api/docs/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-brand-orange underline-offset-2 hover:underline"
+              >
+                Ver documentacion
+              </a>
+            </p>
           </div>
         </div>
       </div>
