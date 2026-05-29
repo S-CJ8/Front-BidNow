@@ -1,4 +1,4 @@
-import { ArrowRight, Clock, Gavel, TrendingUp } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   currentOfferAmount,
@@ -17,7 +17,7 @@ import {
   subastasService,
 } from "../services/apiServices";
 
-const categories = ["Todas", "Relojes", "Vehículos", "Coleccionables", "Arte", "Joyería"];
+const categories = ["Todas", "Relojes", "Vehiculos", "Coleccionables", "Arte", "Joyeria"];
 
 const fallbackAuctionImages = [
   "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=600&q=80",
@@ -31,6 +31,7 @@ export function AuctionGrid() {
   const [pujas, setPujas] = useState<ApiRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Todas");
 
   useEffect(() => {
     let cancelled = false;
@@ -53,14 +54,10 @@ export function AuctionGrid() {
           setError(e instanceof Error ? e.message : "No se pudieron cargar las subastas.");
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const liveCards = useMemo(() => {
@@ -81,55 +78,51 @@ export function AuctionGrid() {
         image,
         time: formatCountdownLabel(sub),
         price: formatCurrency(offer),
-        change: "+0%",
         bids: bidCount,
-        featured: index < 3,
       };
     });
   }, [subastas, productos, pujas]);
 
   return (
-    <section id="subastas" className="bg-black py-16 md:py-24">
+    <section id="subastas" className="border-b border-brand-border py-16 md:py-20">
       <div className="mx-auto max-w-7xl px-6 md:px-8">
+
         <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-orange">
-              Subastas en vivo
+            <p className="font-mono text-[11px] uppercase tracking-widest text-brand-orange">
+              Subastas en Vivo
             </p>
-            <h2 className="mt-2 text-3xl font-bold text-white md:text-4xl">
-              Ofertas activas desde el API
+            <h2 className="mt-2 font-condensed text-4xl font-black uppercase tracking-tight text-white md:text-5xl">
+              Ofertas Activas
             </h2>
-            <p className="mt-2 text-sm text-white/60">
-              Datos en tiempo real de{" "}
+            <p className="mt-2 font-mono text-[11px] text-white/30">
+              Datos en tiempo real desde{" "}
               <a
                 href="https://back-bidnow.onrender.com/api/docs/"
                 target="_blank"
                 rel="noreferrer"
-                className="text-brand-orange underline-offset-2 hover:underline"
+                className="text-brand-orange"
               >
                 back-bidnow.onrender.com
               </a>
             </p>
           </div>
-          <a
-            href="#subastas"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-brand-orange transition hover:brightness-110"
-          >
-            Ver todas las subastas
-            <ArrowRight className="h-4 w-4" aria-hidden />
+          <a href="#subastas" className="font-mono text-[11px] uppercase tracking-widest text-brand-orange">
+            Ver Todas &rarr;
           </a>
         </div>
 
-        <div className="mb-10 flex flex-wrap gap-2 rounded-full bg-brand-pill p-1.5">
-          {categories.map((cat, i) => (
+        <div className="mb-8 flex flex-wrap gap-1">
+          {categories.map((cat) => (
             <button
               key={cat}
               type="button"
-              className={
-                i === 0
-                  ? "rounded-full bg-white px-5 py-2 text-sm font-semibold text-black"
-                  : "rounded-full px-5 py-2 text-sm font-medium text-white/40 transition hover:text-white/70"
-              }
+              onClick={() => setActiveCategory(cat)}
+              className={`px-4 py-2 font-mono text-[11px] uppercase tracking-widest ${
+                activeCategory === cat
+                  ? "bg-brand-orange text-white"
+                  : "border border-brand-border text-white/30"
+              }`}
             >
               {cat}
             </button>
@@ -137,67 +130,57 @@ export function AuctionGrid() {
         </div>
 
         {loading && (
-          <p className="mb-6 text-sm text-white/70">Cargando subastas desde el servidor...</p>
+          <p className="mb-6 font-mono text-[11px] uppercase tracking-widest text-white/30">
+            Cargando subastas...
+          </p>
         )}
         {error && (
-          <p className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <p className="mb-6 border border-red-500/30 bg-red-500/5 px-4 py-3 font-mono text-[11px] text-red-300">
             {error}
           </p>
         )}
-
         {!loading && !error && liveCards.length === 0 && (
-          <p className="mb-6 text-sm text-white/70">
-            No hay subastas en curso en este momento. Publica una desde tu panel despues de iniciar
-            sesion.
+          <p className="mb-6 font-mono text-[11px] uppercase tracking-widest text-white/30">
+            No hay subastas activas. Publica una desde el panel despues de iniciar sesion.
           </p>
         )}
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {liveCards.map((item) => (
             <article
               key={String(item.id)}
-              className="overflow-hidden rounded-2xl bg-brand-card shadow-lg shadow-black/40"
+              className="border border-brand-border bg-brand-card"
             >
               <div className="relative aspect-[4/3] overflow-hidden">
                 <img src={item.image} alt="" className="h-full w-full object-cover" />
-                <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent" />
-                <span className="absolute left-3 top-3 rounded-lg bg-brand-orange px-2.5 py-1 text-xs font-semibold text-white">
+                <div className="absolute left-0 top-0 bg-brand-orange px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white">
                   {item.category}
-                </span>
-                {item.featured && (
-                  <span className="absolute right-3 top-3 rounded-lg bg-gold-badge px-2.5 py-1 text-xs font-semibold text-black">
-                    Destacado
+                </div>
+                <div className="absolute bottom-0 right-0 flex items-center gap-1.5 bg-black/80 px-3 py-1.5">
+                  <Clock className="h-3 w-3 text-brand-orange" aria-hidden />
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-white">
+                    {item.time}
                   </span>
-                )}
-                <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/65 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-                  <Clock className="h-3.5 w-3.5 text-brand-orange" aria-hidden />
-                  {item.time}
                 </div>
               </div>
-              <div className="space-y-4 p-5">
-                <h3 className="text-lg font-semibold leading-snug text-white">{item.title}</h3>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-brand-muted">Oferta actual</span>
-                  <span className="flex items-center gap-2">
-                    <span className="font-semibold text-brand-orange">{item.price}</span>
-                    <span className="flex items-center gap-0.5 text-emerald-400">
-                      <TrendingUp className="h-3.5 w-3.5" aria-hidden />
-                      {item.change}
-                    </span>
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-brand-muted">Pujas</span>
-                  <span className="flex items-center gap-1.5 font-medium text-white">
-                    <Gavel className="h-4 w-4 text-brand-orange/90" aria-hidden />
-                    {item.bids}
-                  </span>
+
+              <div className="p-4">
+                <h3 className="text-sm font-semibold leading-snug text-white">{item.title}</h3>
+                <div className="mt-3 flex items-center justify-between border-t border-brand-border pt-3">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-white/30">Oferta Actual</p>
+                    <p className="mt-0.5 font-condensed text-xl font-black text-brand-orange">{item.price}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-white/30">Pujas</p>
+                    <p className="mt-0.5 font-condensed text-xl font-black text-white">{item.bids}</p>
+                  </div>
                 </div>
                 <a
                   href="#inicio"
-                  className="block w-full rounded-xl bg-brand-orange py-3.5 text-center text-sm font-bold text-white transition hover:brightness-110"
+                  className="mt-3 block w-full bg-brand-orange py-2.5 text-center font-mono text-[11px] font-bold uppercase tracking-widest text-white"
                 >
-                  Inicia sesion para pujar
+                  Inicia Sesion para Pujar
                 </a>
               </div>
             </article>

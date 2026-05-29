@@ -79,11 +79,52 @@ function extractList(raw: unknown): Array<Record<string, unknown>> {
 
 export async function registerUser(input: RegisterInput): Promise<void> {
   const normalizedEmail = input.email.trim().toLowerCase();
+
+  const existing = await httpClient.get<unknown>(
+    `/api/usuarios/?search=${encodeURIComponent(normalizedEmail)}`,
+  );
+  const list = extractList(existing);
+  const alreadyExists = list.some((u) => {
+    const email = toText(u.correo) || toText(u.email);
+    return email.trim().toLowerCase() === normalizedEmail;
+  });
+
+  if (alreadyExists) {
+    throw new Error("Este correo ya esta registrado. Inicia sesion con tu cuenta existente.");
+  }
+
   await usuariosService.create({
     nombre: input.name.trim(),
     correo: normalizedEmail,
     contrasena: input.password,
   });
+}
+
+export async function findUserByEmail(email: string): Promise<NormalizedUser> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const raw = await httpClient.get<unknown>(
+    `/api/usuarios/?search=${encodeURIComponent(normalizedEmail)}`,
+  );
+  const list = extractList(raw);
+  const match = list.find((u) => {
+    const e = toText(u.correo) || toText(u.email);
+    return e.trim().toLowerCase() === normalizedEmail;
+  });
+  if (!match) {
+    throw new Error("No existe un usuario registrado con ese correo.");
+  }
+  const normalized = normalizeUser(match);
+  if (!normalized) {
+    throw new Error("No se pudo leer los datos del usuario.");
+  }
+  return normalized;
+}
+
+export async function updatePassword(
+  userId: string | number,
+  newPassword: string,
+): Promise<void> {
+  await usuariosService.partialUpdate(userId, { contrasena: newPassword });
 }
 
 export async function loginUser(

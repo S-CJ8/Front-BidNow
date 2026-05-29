@@ -1,7 +1,7 @@
-import { Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, User, X } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useApiRequest } from "../hooks/useApiRequest";
-import { NormalizedUser, loginUser, registerUser } from "../services/usersApi";
+import { NormalizedUser, findUserByEmail, loginUser, registerUser, updatePassword } from "../services/usersApi";
 
 type LoginPageProps = {
   onSuccess: (user: NormalizedUser) => void;
@@ -12,8 +12,7 @@ export function LoginPage({ onSuccess, onBackHome }: LoginPageProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [showPassword, setShowPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] =
-    useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -23,13 +22,67 @@ export function LoginPage({ onSuccess, onBackHome }: LoginPageProps) {
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
   const { loading, error, success, run, clearMessages } = useApiRequest();
 
+  const [showReset, setShowReset] = useState(false);
+  const [resetStep, setResetStep] = useState<"email" | "newpass">("email");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetUserId, setResetUserId] = useState<string | number | null>(null);
+  const [resetNewPass, setResetNewPass] = useState("");
+  const [resetConfirmPass, setResetConfirmPass] = useState("");
+  const [showResetPass, setShowResetPass] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const {
+    loading: resetLoading,
+    error: resetError,
+    success: resetSuccess,
+    run: resetRun,
+    clearMessages: clearReset,
+  } = useApiRequest();
+
+  function openReset() {
+    setShowReset(true);
+    setResetStep("email");
+    setResetEmail("");
+    setResetUserId(null);
+    setResetNewPass("");
+    setResetConfirmPass("");
+    clearReset();
+  }
+
+  function closeReset() {
+    setShowReset(false);
+    clearReset();
+  }
+
+  async function handleResetVerifyEmail(e: FormEvent) {
+    e.preventDefault();
+    await resetRun(async () => {
+      const found = await findUserByEmail(resetEmail.trim());
+      if (!found.id) throw new Error("No se pudo identificar el usuario.");
+      setResetUserId(found.id);
+      setResetStep("newpass");
+    }, "");
+  }
+
+  async function handleResetSubmit(e: FormEvent) {
+    e.preventDefault();
+    await resetRun(async () => {
+      if (!resetNewPass.trim()) throw new Error("Ingresa la nueva contrasena.");
+      if (resetNewPass !== resetConfirmPass) throw new Error("Las contrasenas no coinciden.");
+      if (resetNewPass.length < 6) throw new Error("La contrasena debe tener al menos 6 caracteres.");
+      if (resetUserId === null) throw new Error("Sesion expirada. Vuelve a ingresar tu correo.");
+      await updatePassword(resetUserId, resetNewPass);
+      setResetNewPass("");
+      setResetConfirmPass("");
+    }, "Contrasena actualizada correctamente. Ya puedes iniciar sesion.");
+  }
+
   async function handleLoginSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
       const normalizedEmail = loginEmail.trim();
       const user = await run(
         () => loginUser(normalizedEmail, loginPassword),
-        "Inicio de sesión exitoso.",
+        "Acceso concedido.",
       );
       onSuccess(user);
     } catch {
@@ -42,14 +95,14 @@ export function LoginPage({ onSuccess, onBackHome }: LoginPageProps) {
     try {
       await run(async () => {
         if (registerPassword !== registerConfirmPassword) {
-          throw new Error("Las contraseñas no coinciden.");
+          throw new Error("Las contrasenas no coinciden.");
         }
         return registerUser({
           name: registerName,
           email: registerEmail,
           password: registerPassword,
         });
-      }, "Usuario registrado correctamente. Ahora puedes iniciar sesión.");
+      }, "Cuenta creada. Ahora puedes iniciar sesion.");
 
       setMode("login");
       setLoginEmail(registerEmail);
@@ -64,304 +117,422 @@ export function LoginPage({ onSuccess, onBackHome }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-black px-6 py-12 md:py-16">
-      <div className="mx-auto flex max-w-md flex-col">
-        <button
-          type="button"
-          onClick={onBackHome}
-          className="mb-8 self-start text-sm text-white/60 transition hover:text-white"
-        >
-          ← Volver al inicio
-        </button>
+    <div className="min-h-screen bg-brand-dark">
+      <div className="grid min-h-screen md:grid-cols-2">
+        {/* Panel izquierdo - formulario */}
+        <div className="flex flex-col justify-center px-8 py-12 md:px-16">
+          <button
+            type="button"
+            onClick={onBackHome}
+            className="mb-10 self-start font-mono text-[11px] uppercase tracking-widest text-white/30"
+          >
+            &larr; Volver
+          </button>
 
-        <div className="text-center">
-          <h1 className="font-sans text-2xl font-bold uppercase tracking-wide text-brand-orange md:text-3xl">
-            BidNow
-          </h1>
-          <h2 className="mt-4 text-xl font-bold text-white md:text-2xl">
-            {mode === "login" ? "Bienvenido de Nuevo" : "Crea tu cuenta"}
-          </h2>
-          <p className="mt-2 text-sm text-brand-muted">
-            {mode === "login"
-              ? "Inicia sesión para acceder a tu cuenta"
-              : "Regístrate para empezar a pujar"}
-          </p>
-        </div>
-
-        <div className="mt-10 rounded-2xl border border-white/10 bg-brand-card p-6 shadow-xl shadow-black/50 md:p-8">
-          {mode === "login" ? (
-            <form className="space-y-5" onSubmit={handleLoginSubmit}>
-              <div>
-                <label
-                  htmlFor="login-email"
-                  className="mb-2 block text-sm font-medium text-white"
-                >
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail
-                    className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-muted"
-                    aria-hidden
-                  />
-                  <input
-                    id="login-email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="tu@email.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-white/15 bg-black/40 py-3 pl-11 pr-4 text-sm text-white placeholder:text-brand-muted focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="login-password"
-                  className="mb-2 block text-sm font-medium text-white"
-                >
-                  Contraseña
-                </label>
-                <div className="relative">
-                  <Lock
-                    className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-muted"
-                    aria-hidden
-                  />
-                  <input
-                    id="login-password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-white/15 bg-black/40 py-3 pl-11 pr-12 text-sm text-white placeholder:text-brand-muted focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted transition hover:text-white"
-                    aria-label={
-                      showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-                <label className="flex cursor-pointer items-center gap-2 text-brand-muted">
-                  <input
-                    type="checkbox"
-                    name="remember"
-                    className="h-4 w-4 rounded border-white/20 bg-black/40 text-brand-orange focus:ring-brand-orange"
-                  />
-                  Recordarme
-                </label>
-                <a
-                  href="#"
-                  className="font-medium text-brand-orange transition hover:brightness-110"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  ¿Olvidaste tu contraseña?
-                </a>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-brand-orange py-3.5 text-center text-sm font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loading ? "Validando..." : "Iniciar Sesión"}
-              </button>
-            </form>
-          ) : (
-            <form className="space-y-5" onSubmit={handleRegisterSubmit}>
-              <div>
-                <label
-                  htmlFor="register-name"
-                  className="mb-2 block text-sm font-medium text-white"
-                >
-                  Nombre
-                </label>
-                <div className="relative">
-                  <User
-                    className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-muted"
-                    aria-hidden
-                  />
-                  <input
-                    id="register-name"
-                    name="name"
-                    type="text"
-                    placeholder="Tu nombre"
-                    value={registerName}
-                    onChange={(e) => setRegisterName(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-white/15 bg-black/40 py-3 pl-11 pr-4 text-sm text-white placeholder:text-brand-muted focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="register-email"
-                  className="mb-2 block text-sm font-medium text-white"
-                >
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail
-                    className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-muted"
-                    aria-hidden
-                  />
-                  <input
-                    id="register-email"
-                    name="email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={registerEmail}
-                    onChange={(e) => setRegisterEmail(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-white/15 bg-black/40 py-3 pl-11 pr-4 text-sm text-white placeholder:text-brand-muted focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="register-password"
-                  className="mb-2 block text-sm font-medium text-white"
-                >
-                  Contraseña
-                </label>
-                <div className="relative">
-                  <Lock
-                    className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-muted"
-                    aria-hidden
-                  />
-                  <input
-                    id="register-password"
-                    name="password"
-                    type={showRegisterPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={registerPassword}
-                    onChange={(e) => setRegisterPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    className="w-full rounded-xl border border-white/15 bg-black/40 py-3 pl-11 pr-12 text-sm text-white placeholder:text-brand-muted focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowRegisterPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted transition hover:text-white"
-                    aria-label={
-                      showRegisterPassword
-                        ? "Ocultar contraseña"
-                        : "Mostrar contraseña"
-                    }
-                  >
-                    {showRegisterPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="register-confirm-password"
-                  className="mb-2 block text-sm font-medium text-white"
-                >
-                  Confirmar contraseña
-                </label>
-                <div className="relative">
-                  <Lock
-                    className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-muted"
-                    aria-hidden
-                  />
-                  <input
-                    id="register-confirm-password"
-                    name="confirm-password"
-                    type={showRegisterConfirmPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={registerConfirmPassword}
-                    onChange={(e) => setRegisterConfirmPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    className="w-full rounded-xl border border-white/15 bg-black/40 py-3 pl-11 pr-12 text-sm text-white placeholder:text-brand-muted focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowRegisterConfirmPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted transition hover:text-white"
-                    aria-label={
-                      showRegisterConfirmPassword
-                        ? "Ocultar contraseña"
-                        : "Mostrar contraseña"
-                    }
-                  >
-                    {showRegisterConfirmPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-brand-orange py-3.5 text-center text-sm font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loading ? "Registrando..." : "Crear Cuenta"}
-              </button>
-            </form>
-          )}
-
-          {(error || success) && (
-            <p
-              className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
-                error
-                  ? "border-red-500/60 bg-red-500/10 text-red-200"
-                  : "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
-              }`}
-            >
-              {error || success}
+          <div className="mb-10">
+            <p className="font-condensed text-3xl font-black uppercase tracking-widest text-brand-orange">
+              BidNow
             </p>
-          )}
+            <p className="mt-1 font-mono text-[11px] uppercase tracking-widest text-white/30">
+              {mode === "login" ? "Terminal de Acceso" : "Registro de Cuenta"}
+            </p>
+          </div>
 
-          <p className="mt-6 text-center text-sm text-brand-muted">
-            {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
-            <button
-              type="button"
-              className="font-semibold text-brand-orange transition hover:brightness-110"
-              onClick={() => {
-                clearMessages();
-                setMode((prev) => (prev === "login" ? "register" : "login"));
-              }}
-            >
-              {mode === "login" ? "Regístrate aquí" : "Inicia sesión"}
-            </button>
-          </p>
+          <div className="border border-brand-border bg-brand-card p-6 md:p-8">
+            <p className="mb-6 font-mono text-[11px] uppercase tracking-widest text-white/30">
+              {mode === "login" ? "Credenciales de Acceso" : "Datos del nuevo usuario"}
+            </p>
+
+            {mode === "login" ? (
+              <form className="space-y-5" onSubmit={handleLoginSubmit}>
+                <div>
+                  <label htmlFor="login-email" className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                    Identidad (Email)
+                  </label>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                    <input
+                      id="login-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="usuario@correo.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      required
+                      className="w-full border border-brand-border bg-brand-dark py-3 pl-10 pr-4 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="login-password" className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                    Clave de Acceso
+                  </label>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                    <input
+                      id="login-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      required
+                      className="w-full border border-brand-border bg-brand-dark py-3 pl-10 pr-12 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"
+                      aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px]">
+                  <label className="flex cursor-pointer items-center gap-2 font-mono uppercase tracking-widest text-white/30">
+                    <input
+                      type="checkbox"
+                      name="remember"
+                      className="h-3 w-3 border border-brand-border bg-brand-dark accent-brand-orange"
+                    />
+                    Recordar sesion
+                  </label>
+                  <button
+                    type="button"
+                    onClick={openReset}
+                    className="font-mono text-[11px] uppercase tracking-widest text-brand-orange"
+                  >
+                    Recuperar contrasena
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-brand-orange py-3 font-mono text-[11px] font-bold uppercase tracking-widest text-white disabled:opacity-50"
+                >
+                  {loading ? "Verificando..." : "Iniciar Sesion"}
+                </button>
+              </form>
+            ) : (
+              <form className="space-y-5" onSubmit={handleRegisterSubmit}>
+                <div>
+                  <label htmlFor="register-name" className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                    Nombre Completo
+                  </label>
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                    <input
+                      id="register-name"
+                      name="name"
+                      type="text"
+                      placeholder="Tu nombre"
+                      value={registerName}
+                      onChange={(e) => setRegisterName(e.target.value)}
+                      required
+                      className="w-full border border-brand-border bg-brand-dark py-3 pl-10 pr-4 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="register-email" className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                    Correo Electronico
+                  </label>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                    <input
+                      id="register-email"
+                      name="email"
+                      type="email"
+                      placeholder="usuario@correo.com"
+                      value={registerEmail}
+                      onChange={(e) => setRegisterEmail(e.target.value)}
+                      required
+                      className="w-full border border-brand-border bg-brand-dark py-3 pl-10 pr-4 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="register-password" className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                    Contrasena
+                  </label>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                    <input
+                      id="register-password"
+                      name="password"
+                      type={showRegisterPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={registerPassword}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      className="w-full border border-brand-border bg-brand-dark py-3 pl-10 pr-12 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegisterPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"
+                      aria-label={showRegisterPassword ? "Ocultar" : "Mostrar"}
+                    >
+                      {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="register-confirm-password" className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                    Confirmar Contrasena
+                  </label>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                    <input
+                      id="register-confirm-password"
+                      name="confirm-password"
+                      type={showRegisterConfirmPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={registerConfirmPassword}
+                      onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      className="w-full border border-brand-border bg-brand-dark py-3 pl-10 pr-12 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegisterConfirmPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"
+                      aria-label={showRegisterConfirmPassword ? "Ocultar" : "Mostrar"}
+                    >
+                      {showRegisterConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-brand-orange py-3 font-mono text-[11px] font-bold uppercase tracking-widest text-white disabled:opacity-50"
+                >
+                  {loading ? "Procesando..." : "Crear Cuenta"}
+                </button>
+              </form>
+            )}
+
+            {(error || success) && (
+              <p className={`mt-4 border px-4 py-3 font-mono text-[11px] ${
+                error
+                  ? "border-red-500/40 bg-red-500/5 text-red-300"
+                  : "border-emerald-500/40 bg-emerald-500/5 text-emerald-300"
+              }`}>
+                {error || success}
+              </p>
+            )}
+
+            <p className="mt-6 font-mono text-[11px] text-white/30">
+              {mode === "login" ? "¿Ya te registraste?" : "¿Ya tienes cuenta?"}{" "}
+              <button
+                type="button"
+                className="text-brand-orange"
+                onClick={() => {
+                  clearMessages();
+                  setMode((prev) => (prev === "login" ? "register" : "login"));
+                }}
+              >
+                {mode === "login" ? "Registrate" : "Inicia sesion"}
+              </button>
+            </p>
+          </div>
+
         </div>
 
-        <div className="mt-6 rounded-xl border-2 border-brand-orange bg-[#1a0f0a] px-4 py-3 text-center text-sm font-medium text-brand-orange">
-          💡 Si tu backend está en otra URL, define `FRONTEND_API_BASE_URL` o
-          `VITE_API_BASE_URL` como la raíz del API (p. ej. https://back-bidnow.onrender.com/api),
-          sin añadir `/usuarios` al final.
-        </div>
+        {/* Panel derecho - imagen */}
+        <div
+          className="hidden bg-cover bg-center md:block"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(8,8,8,1) 0%, rgba(8,8,8,0.4) 30%, rgba(8,8,8,0.1) 100%), url(https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTu1qgHraD1FtM2lLjsrV7rCDCru1WhQmTS_g&s)",
+          }}
+        />
       </div>
+
+      {/* Modal recuperar contrasena */}
+      {showReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
+          <div className="w-full max-w-sm border border-brand-border bg-brand-dark">
+
+            {/* Cabecera del modal */}
+            <div className="flex items-center justify-between border-b border-brand-border px-5 py-4">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-brand-orange">
+                  Seguridad
+                </p>
+                <p className="mt-0.5 font-condensed text-lg font-black uppercase tracking-widest text-white">
+                  Recuperar Contraseña
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeReset}
+                className="text-white/30"
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              {/* PASO 1 — verificar correo */}
+              {resetStep === "email" && (
+                <form onSubmit={handleResetVerifyEmail} className="space-y-4">
+                  <p className="font-mono text-[11px] text-white/40">
+                    Ingresa el correo asociado a tu cuenta. Si existe, podras cambiar tu contraseña.
+                  </p>
+
+                  <div>
+                    <label className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                      Correo Electronico
+                    </label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                      <input
+                        type="email"
+                        required
+                        value={resetEmail}
+                        onChange={(e) => { setResetEmail(e.target.value); clearReset(); }}
+                        placeholder="usuario@correo.com"
+                        className="w-full border border-brand-border bg-black py-3 pl-10 pr-4 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {resetError && (
+                    <p className="border border-red-500/40 bg-red-500/5 px-3 py-2 font-mono text-[11px] text-red-300">
+                      {resetError}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="w-full bg-brand-orange py-2.5 font-mono text-[11px] font-bold uppercase tracking-widest text-white disabled:opacity-50"
+                  >
+                    {resetLoading ? "Verificando..." : "Verificar Correo"}
+                  </button>
+                </form>
+              )}
+
+              {/* PASO 2 — nueva contrasena */}
+              {resetStep === "newpass" && (
+                <form onSubmit={handleResetSubmit} className="space-y-4">
+                  <div className="border border-emerald-500/30 bg-emerald-500/5 px-3 py-2">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-400">
+                      Correo verificado
+                    </p>
+                    <p className="mt-0.5 font-mono text-[11px] text-white/40">{resetEmail}</p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                      Nueva Contrasena
+                    </label>
+                    <div className="relative">
+                      <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                      <input
+                        type={showResetPass ? "text" : "password"}
+                        required
+                        minLength={6}
+                        value={resetNewPass}
+                        onChange={(e) => { setResetNewPass(e.target.value); clearReset(); }}
+                        placeholder="••••••••"
+                        className="w-full border border-brand-border bg-black py-3 pl-10 pr-12 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResetPass((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"
+                      >
+                        {showResetPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-white/40">
+                      Confirmar Contrasena
+                    </label>
+                    <div className="relative">
+                      <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" aria-hidden />
+                      <input
+                        type={showResetConfirm ? "text" : "password"}
+                        required
+                        minLength={6}
+                        value={resetConfirmPass}
+                        onChange={(e) => { setResetConfirmPass(e.target.value); clearReset(); }}
+                        placeholder="••••••••"
+                        className="w-full border border-brand-border bg-black py-3 pl-10 pr-12 font-mono text-sm text-white placeholder:text-white/20 focus:border-brand-orange focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResetConfirm((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"
+                      >
+                        {showResetConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {resetError && (
+                    <p className="border border-red-500/40 bg-red-500/5 px-3 py-2 font-mono text-[11px] text-red-300">
+                      {resetError}
+                    </p>
+                  )}
+
+                  {resetSuccess && (
+                    <p className="border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 font-mono text-[11px] text-emerald-300">
+                      {resetSuccess}
+                    </p>
+                  )}
+
+                  {!resetSuccess && (
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      className="w-full bg-brand-orange py-2.5 font-mono text-[11px] font-bold uppercase tracking-widest text-white disabled:opacity-50"
+                    >
+                      {resetLoading ? "Guardando..." : "Cambiar Contrasena"}
+                    </button>
+                  )}
+
+                  {resetSuccess && (
+                    <button
+                      type="button"
+                      onClick={closeReset}
+                      className="w-full border border-brand-border py-2.5 font-mono text-[11px] uppercase tracking-widest text-white/50"
+                    >
+                      Cerrar e Iniciar Sesion
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => { setResetStep("email"); clearReset(); }}
+                    className="w-full font-mono text-[10px] uppercase tracking-widest text-white/20"
+                  >
+                    Usar otro correo
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

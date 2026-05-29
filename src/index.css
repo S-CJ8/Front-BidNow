@@ -2,10 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+*,
+*::before,
+*::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 body {
-  @apply bg-black text-white font-sans antialiased;
+  @apply bg-brand-dark text-white font-sans antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #0e0e0e;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+}
+
+select option {
+  background-color: #131313;
+  color: white;
 }
